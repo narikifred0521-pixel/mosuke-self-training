@@ -1,0 +1,763 @@
+<!doctype html>
+<html lang="ja"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#d81e2c">
+<meta name="description" content="MöSUKEの全種目を1人で練習できるアプリ。本番ルールで挑戦、成績表づくり、縮尺どおりの配置図。">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font-size:14px}img{max-width:100%}[hidden]{display:none!important}</style>
+</head><body>
+<title>MöSUKE セルフ練習</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Zen+Kaku+Gothic+New:wght@400;700;900&display=swap">
+<style>
+/* Layout: one-column phone tool. Black field, red band = MöSUKE identity; big thumb buttons at the bottom. */
+:root{
+  --bg:#0b0b0c; --panel:#161618; --line:#2a2a2e; --fg:#f2f0ec; --mute:#9a978f;
+  --red:#d81e2c; --red-deep:#8e111b; --gold:#e8c35a; --ok:#3fbf7f; --ng:#5b5b62;
+  --display:"Anton","Impact","Arial Narrow",sans-serif;
+  --body:"Zen Kaku Gothic New","Hiragino Sans","Noto Sans JP",sans-serif;
+  color-scheme:dark;
+}
+html,body{height:100%}
+body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:15px;line-height:1.6;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0 24px}
+*{box-sizing:border-box}
+button{font-family:inherit;color:inherit;cursor:pointer;border:0;background:none}
+button:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+.wrap{max-width:560px;margin:0 auto;display:flex;flex-direction:column;gap:20px}
+
+/* header band */
+.band{margin-inline:calc(-1 * max(16px,env(safe-area-inset-left,0px)));background:var(--red);
+  padding:14px max(16px,env(safe-area-inset-left,0px)) 12px;display:flex;align-items:baseline;justify-content:space-between;gap:12px}
+.band .logo{font-family:var(--display);font-size:30px;letter-spacing:.04em;line-height:1}
+.band .sub{font-size:12px;font-weight:700;letter-spacing:.12em}
+.band button{font-size:13px;font-weight:700;padding:6px 10px;border:1.5px solid var(--fg);border-radius:4px}
+
+h2{font-family:var(--display);font-weight:400;font-size:22px;letter-spacing:.06em;margin:0;display:flex;align-items:baseline;gap:10px}
+h2 small{font-family:var(--body);font-size:12px;color:var(--mute);letter-spacing:.04em;font-weight:700}
+.sec{display:flex;flex-direction:column;gap:10px}
+.hint{color:var(--mute);font-size:13px;margin:0}
+
+/* stage buttons */
+.stages{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.stbtn{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:12px;text-align:left;display:flex;flex-direction:column;gap:2px}
+.stbtn b{font-family:var(--display);font-weight:400;font-size:22px;letter-spacing:.04em;line-height:1.1}
+.stbtn span{font-size:12px;color:var(--mute)}
+.stbtn.all{grid-column:1/-1;background:var(--red-deep);border-color:var(--red)}
+.stbtn.all span{color:var(--fg);opacity:.8}
+
+/* event list */
+.evlist{display:flex;flex-direction:column;border-top:1px solid var(--line)}
+.evrow{display:grid;grid-template-columns:44px 1fr auto;gap:10px;align-items:center;padding:10px 4px;border-bottom:1px solid var(--line);text-align:left;width:100%}
+.evrow .code{font-family:var(--display);font-size:18px;color:var(--red)}
+.evrow .nm{font-weight:700;font-size:14px;line-height:1.3}
+.evrow .nm em{display:block;font-style:normal;font-weight:400;font-size:12px;color:var(--mute)}
+.rate{font-family:var(--display);font-size:18px;font-variant-numeric:tabular-nums;text-align:right;min-width:52px}
+.rate small{display:block;font-family:var(--body);font-size:10px;color:var(--mute)}
+.stagehead{font-family:var(--display);font-size:13px;letter-spacing:.14em;color:var(--mute);padding:12px 4px 2px}
+
+/* history */
+.hist{display:flex;flex-direction:column;gap:6px}
+.hrow{display:flex;justify-content:space-between;gap:10px;padding:8px 10px;background:var(--panel);border-radius:4px;font-size:13px}
+.hrow .res{font-weight:900}
+.res.win{color:var(--gold)} .res.lose{color:var(--mute)}
+.empty{color:var(--mute);font-size:13px;padding:10px;border:1px dashed var(--line);border-radius:6px}
+
+/* play screen */
+.play{display:flex;flex-direction:column;gap:14px;min-height:calc(100% - 60px)}
+.evtitle{display:flex;flex-direction:column;gap:2px}
+.evtitle .code{font-family:var(--display);font-size:16px;color:var(--red);letter-spacing:.08em}
+.evtitle .nm{font-size:22px;font-weight:900;line-height:1.25}
+.evtitle .rule{font-size:13px;color:var(--mute)}
+.steps{display:flex;gap:6px}
+.step{flex:1;border:1px solid var(--line);border-radius:6px;padding:10px 4px;text-align:center;font-family:var(--display);font-size:20px;font-variant-numeric:tabular-nums;line-height:1.1;color:var(--mute)}
+.step.cur{border-color:var(--fg);color:var(--fg);background:var(--panel)}
+.step.done{background:var(--red);border-color:var(--red);color:var(--fg)}
+.step small{display:block;font-family:var(--body);font-size:10px;font-weight:700}
+.big{font-family:var(--display);font-size:clamp(64px,22vw,120px);line-height:1;text-align:center;font-variant-numeric:tabular-nums;letter-spacing:.02em}
+.biglabel{text-align:center;font-size:12px;font-weight:700;color:var(--mute);letter-spacing:.14em}
+.misses{display:flex;justify-content:center;gap:10px;align-items:center}
+.pip{width:18px;height:18px;border-radius:50%;border:2px solid var(--fg)}
+.pip.used{background:var(--ng);border-color:var(--ng)}
+.pip.last{border-color:var(--red)}
+.misslabel{font-size:12px;color:var(--mute);font-weight:700}
+.actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:auto}
+.act{border-radius:8px;padding:22px 0;font-family:var(--display);font-size:34px;letter-spacing:.06em}
+.act.clear{background:var(--fg);color:var(--bg)}
+.act.miss{background:var(--panel);border:2px solid var(--ng)}
+.act:active{transform:scale(.98)}
+.subacts{display:flex;justify-content:space-between;gap:8px}
+.ghost{font-size:13px;font-weight:700;color:var(--mute);padding:8px 4px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:1px solid var(--line);border-radius:999px;padding:6px 14px;font-weight:700;font-size:14px}
+.chip[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.tally{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;text-align:center}
+.tally div{background:var(--panel);border-radius:6px;padding:10px 4px}
+.tally b{display:block;font-family:var(--display);font-size:30px;font-weight:400;font-variant-numeric:tabular-nums;line-height:1.1}
+.tally span{font-size:11px;color:var(--mute);font-weight:700}
+.streak{display:flex;gap:4px;flex-wrap:wrap;justify-content:center;min-height:14px}
+.dot.lg{width:22px;height:22px;border-radius:4px}
+.dot.todo{background:transparent;border:2px solid var(--line)}
+.dot.now{background:transparent;border:2px solid var(--fg)}
+.sheetprog{height:6px;background:var(--panel);border-radius:3px;overflow:hidden}
+.sheetprog div{height:100%;background:var(--red)}
+.sheetset{display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:13px;font-weight:700;color:var(--mute)}
+.chk{display:inline-flex;align-items:center;gap:6px;color:var(--fg);font-weight:700}
+.chk input{width:18px;height:18px;accent-color:var(--red)}
+.dot{width:10px;height:10px;border-radius:2px;background:var(--ng)}
+.dot.c{background:var(--fg)}
+
+/* final */
+.timer{font-family:var(--display);font-size:clamp(70px,24vw,128px);line-height:1;text-align:center;font-variant-numeric:tabular-nums}
+.timer.warn{color:var(--red)}
+.score{display:flex;justify-content:center;align-items:baseline;gap:8px}
+.score b{font-family:var(--display);font-size:56px;font-weight:400;font-variant-numeric:tabular-nums;line-height:1}
+.score span{font-family:var(--display);font-size:22px;color:var(--mute)}
+.pad{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.pad button{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:14px 0;font-family:var(--display);font-size:26px;font-variant-numeric:tabular-nums}
+.pad .m{grid-column:span 2;background:transparent;border:2px solid var(--ng);font-size:22px}
+.pad .u{grid-column:span 2;font-family:var(--body);font-size:14px;font-weight:700;color:var(--mute)}
+.pad button:disabled{opacity:.35}
+.log{font-size:12px;color:var(--mute);text-align:center;min-height:18px;font-variant-numeric:tabular-nums}
+.start{background:var(--red);border-radius:8px;padding:22px 0;font-family:var(--display);font-size:34px;letter-spacing:.08em;width:100%}
+.goal{background:var(--gold);color:var(--bg);border-radius:50%;width:150px;height:150px;margin:0 auto;font-family:var(--display);font-size:34px;letter-spacing:.06em;display:block}
+
+/* result overlay */
+.result{display:flex;flex-direction:column;gap:14px;padding-top:24px;text-align:center}
+.result .head{font-family:var(--display);font-size:clamp(44px,14vw,72px);line-height:1.05;letter-spacing:.03em}
+.result .head.win{color:var(--gold)}
+.result p{margin:0;color:var(--mute)}
+.btncol{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+.btn{border-radius:8px;padding:14px;font-weight:900;font-size:16px;background:var(--panel);border:1px solid var(--line)}
+.btn.pri{background:var(--red);border-color:var(--red)}
+.summary{display:flex;flex-direction:column;gap:4px;text-align:left}
+.summary div{display:flex;justify-content:space-between;gap:10px;padding:8px 10px;background:var(--panel);border-radius:4px;font-size:13px}
+.danger{color:var(--red);font-size:12px;font-weight:700;padding:6px 0;align-self:flex-start}
+.confirm{display:flex;gap:8px;align-items:center;font-size:13px;flex-wrap:wrap}
+/* 配置図 */
+.figbtn{display:inline-flex;align-items:center;gap:6px;align-self:flex-start;border:1.5px solid var(--gold);color:var(--gold);border-radius:999px;padding:5px 14px;font-weight:900;font-size:13px}
+.figbtn svg{width:14px;height:14px}
+.figlinks{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:12px;color:var(--mute);font-weight:700}
+.figlinks .chip{font-size:13px;padding:4px 12px}
+.sheet{position:fixed;inset:0;z-index:10;background:rgba(5,5,6,.94);overflow-y:auto;
+  padding:calc(12px + env(safe-area-inset-top,0px)) max(12px,env(safe-area-inset-right,0px)) calc(24px + env(safe-area-inset-bottom,0px)) max(12px,env(safe-area-inset-left,0px))}
+.sheet .bar{position:sticky;top:0;display:flex;justify-content:space-between;align-items:center;gap:10px;max-width:520px;margin:0 auto 10px;font-weight:900}
+.sheet .bar button{background:var(--fg);color:var(--bg);border-radius:999px;padding:8px 18px;font-weight:900;font-size:14px}
+.lays{max-width:520px;margin:0 auto;display:flex;flex-direction:column;gap:12px}
+.lay{background:#151d38;border-radius:8px;padding:14px 12px 12px;display:flex;flex-direction:column;gap:6px;border-bottom:4px solid #e0202f;box-shadow:0 3px 0 #f0b429}
+.lay svg{display:block;width:100%;height:auto}
+.layhead{display:flex;align-items:center;gap:8px;flex-wrap:wrap;border-left:4px solid #e0202f;padding-left:10px}
+.layhead b{font-family:var(--display);font-weight:400;font-size:24px;color:#f0b429;font-style:italic}
+.layhead span{font-weight:900;font-size:17px;color:#f4f4f6}
+.layhead em{font-style:normal;margin-left:auto;background:#e0202f;color:#f4f4f6;font-weight:900;font-size:12px;padding:2px 8px;border-radius:4px}
+.laynote{margin:0;background:#1c2547;color:#f0b429;font-weight:900;font-size:13px;padding:8px 10px;border-radius:6px;text-align:center}
+.scale-note{margin:0;color:var(--mute);font-size:12px}
+.share{max-width:520px;margin:0 auto;display:flex;flex-direction:column;gap:12px}
+.share img.card{display:block;width:100%;border-radius:6px;background:#151d38;aspect-ratio:4/5}
+.fld{display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:700;color:var(--mute)}
+.fld input,.fld textarea{font:inherit;font-size:15px;font-weight:400;color:var(--fg);background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:10px;width:100%}
+.how{margin:0;padding:0;list-style:none;counter-reset:s;display:flex;flex-direction:column;gap:10px}
+.how li{counter-increment:s;display:flex;flex-direction:column;gap:6px;background:var(--panel);border-radius:8px;padding:12px}
+.how li b::before{content:counter(s) "　";font-family:var(--display);font-weight:400;color:var(--gold);font-size:18px}
+.how .btn{display:block;text-align:center;text-decoration:none;color:var(--fg);width:100%}
+.how .btn:disabled{opacity:.5}
+.xbtn{background:var(--fg)!important;color:var(--bg)!important;border-color:var(--fg)!important}
+.photoview{position:fixed;inset:0;z-index:20;background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;
+  padding:calc(16px + env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) calc(16px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+.photoview img{max-width:100%;max-height:68vh;object-fit:contain;-webkit-touch-callout:default;-webkit-user-select:auto;user-select:auto;border-radius:4px}
+.pv-tip{margin:0;color:#f4f4f6;text-align:center;font-size:18px;font-weight:700;line-height:1.5}
+.pv-tip b{color:#f0b429}
+.pv-tip small{font-size:13px;color:#9aa2bd;font-weight:700}
+.pv-close{background:#f4f4f6;color:#0b0b0c;border-radius:999px;padding:12px 24px;font-weight:900;font-size:15px}
+.sharesheet{padding-bottom:calc(96px + env(safe-area-inset-bottom,0px))}
+.cardwrap{margin:0;position:relative;display:flex;flex-direction:column;gap:8px}
+.share img.card{-webkit-touch-callout:default;-webkit-user-select:auto;user-select:auto;cursor:pointer;box-shadow:0 6px 24px rgba(0,0,0,.5)}
+.cardwrap figcaption{background:var(--gold);color:#151d38;font-weight:900;font-size:14px;text-align:center;border-radius:8px;padding:10px 12px}
+.cardwrap figcaption.flash{animation:flash .9s}
+@keyframes flash{30%{transform:scale(1.04)}}
+.txt summary{cursor:pointer;font-size:13px;font-weight:700;color:var(--mute);padding:6px 0}
+.txt[open]{display:flex;flex-direction:column;gap:8px}
+.savebar{position:fixed;left:0;right:0;bottom:0;z-index:11;display:grid;grid-template-columns:1fr auto;gap:8px;background:rgba(11,11,12,.96);border-top:1px solid var(--line);
+  padding:10px max(12px,env(safe-area-inset-right,0px)) calc(10px + env(safe-area-inset-bottom,0px)) max(12px,env(safe-area-inset-left,0px))}
+.savebar>*{max-width:100%}
+.savebtn{display:flex;align-items:center;justify-content:center;gap:10px;background:var(--gold);color:#151d38;border-radius:10px;padding:16px 12px;font-weight:900;font-size:18px;min-height:58px}
+.savebtn .ic{font-size:22px;line-height:1}
+.savebtn:disabled{opacity:.55}
+.savebtn.done{background:var(--ok);color:#0b0b0c}
+.savebtn.alt{background:var(--panel);color:var(--fg);border:1.5px solid var(--gold)}
+.xopen{display:flex;align-items:center;justify-content:center;gap:4px;border:1.5px solid var(--fg);border-radius:10px;padding:0 16px;font-weight:900;font-size:15px;color:var(--fg);text-decoration:none;white-space:nowrap}
+.xopen b{font-family:var(--display);font-weight:400;font-size:20px}
+.xopen.next{background:var(--fg);color:var(--bg)}
+@media (prefers-reduced-motion:reduce){.cardwrap figcaption.flash{animation:none}}
+.sharebtn{display:inline-flex;align-items:center;gap:6px;border:1.5px solid var(--fg);border-radius:999px;padding:6px 14px;font-weight:900;font-size:13px;align-self:flex-start}
+.sheet .nav{display:flex;justify-content:space-between;max-width:520px;margin:10px auto 0;gap:8px}
+.sheet .nav button{flex:1;border:1px solid var(--line);border-radius:6px;padding:10px;font-weight:700;font-size:13px}
+.sheet .nav button:disabled{opacity:.3}
+@media (prefers-reduced-motion:no-preference){.act,.pad button{transition:transform .06s}}
+</style>
+
+<div class="wrap" id="app"></div>
+
+<script>
+// ===== ルール（出典：判定早見表 2026-09-24／1stミス3回 2026-09-27） =====
+const STAGES=[
+ {id:"1st",name:"1st STAGE",note:"1-1〜1-4は3つクリア・ミス3回まで／1-5はミス1回まで",events:[
+  {code:"1-1",name:"ステップバイステップ",kind:"順手",targets:["4m","6m","8m"],miss:3,rule:"近い順に1本ずつ倒す"},
+  {code:"1-2",name:"ウッドボーン",kind:"縦",targets:["3.5m","4m","4.5m"],miss:3,rule:"スキットル1本の太さ分の間隔で近い順"},
+  {code:"1-3",name:"スローアンドジェントル",kind:"手前取り",targets:["4m","4.5m","5m"],miss:3,rule:"モルック棒1本分の間隔で近い順"},
+  {code:"1-4",name:"パワークラッシュ",kind:"飛ばし",targets:["4→8m","5→9m","6→10m"],miss:3,rule:"ラインに少しでもかかればクリア"},
+  {code:"1-5",name:"そりたつモル棒",kind:"ふわり",targets:["1本"],miss:1,rule:"手前に立てた棒を越えて倒す。棒に当たったらミス"}]},
+ {id:"2nd",name:"2nd STAGE",note:"各種目1回クリア・ミス2回まで",events:[
+  {code:"2-1",name:"ヘルトライアングル",kind:"縦ふわり",targets:["3.5m"],miss:2,rule:"逆三角形の奥2本の間にある狙いを倒す"},
+  {code:"2-2",name:"ナッシングハップン",kind:"その場取り",targets:["4m"],miss:2,rule:"棒1本分の円にモルックとスキットルが両方入る"},
+  {code:"2-3",name:"オーバーザウォール",kind:"束裏飛ばし",targets:["4.5→8m"],miss:2,rule:"3.5mの壁を越えて8mまで飛ばす。壁を倒したらミス"},
+  {code:"2-4",name:"プレッシャーストレート",kind:"遠投",targets:["10m"],miss:2,rule:"1本倒す"}]},
+ {id:"3rd",name:"3rd STAGE",note:"各種目ミス1回まで",events:[
+  {code:"3-1",name:"デビルフック",kind:"曲げ",targets:["左","右"],miss:1,rule:"3本並び（4m）の真ん中だけを倒す。左右1回ずつ"},
+  {code:"3-2",name:"デスエンド",kind:"遠投",targets:["12m"],miss:1,rule:"1本倒す"},
+  {code:"3-3",name:"クレイジータイニーウッド",kind:"端引っ掛け",targets:["左","右"],miss:1,rule:"3.5mの陰から半分見える奥を倒す。左右1回ずつ"},
+  {code:"3-4",name:"キャッチザレインボー",kind:"ふわり",targets:["7m"],miss:1,rule:"手前から2本分あけた奥を倒す"}]},
+ {id:"final",name:"FINAL",note:"タイムアタック50（1分10秒）",events:[]}
+];
+const FINAL_SEC=70;
+const ALL_EVENTS=STAGES.flatMap(s=>s.events.map(e=>({...e,stage:s.id})));
+const evByCode=c=>ALL_EVENTS.find(e=>e.code===c);
+
+// ===== 保存（この端末のブラウザだけ） =====
+const KEY="mosuke_self_v1";
+function load(){try{const d=JSON.parse(localStorage.getItem(KEY)||"null");if(d&&d.throws)return d}catch(e){}return{throws:[],runs:[]}}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(DB))}catch(e){}}
+let DB=load();
+function logThrow(code,target,ok,mode){DB.throws.push({t:Date.now(),code,target,ok,mode});save()}
+function unlogThrow(){DB.throws.pop();save()}
+function addRun(r){DB.runs.unshift({t:Date.now(),...r});DB.runs=DB.runs.slice(0,200);save()}
+function stat(code,target){const a=DB.throws.filter(x=>x.code===code&&(target==null||x.target===target));const c=a.filter(x=>x.ok).length;return{n:a.length,c,rate:a.length?Math.round(c/a.length*100):null}}
+
+// ===== 共通 =====
+const app=document.getElementById("app");
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const buzz=p=>{try{navigator.vibrate&&navigator.vibrate(p)}catch(e){}};
+let wake=null;async function keepAwake(){try{if(navigator.wakeLock&&!wake)wake=await navigator.wakeLock.request("screen");wake&&wake.addEventListener("release",()=>wake=null)}catch(e){}}
+const fmtDate=t=>{const d=new Date(t);return`${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`};
+function band(right){return`<header class="band"><div><div class="logo">MöSUKE</div><div class="sub">SELF TRAINING</div></div>${right||""}</header>`}
+let timerId=null;function stopTimer(){if(timerId){clearInterval(timerId);timerId=null}}
+
+// ===== 配置図（9/27ルールブックの見た目で、縮尺どおりに描く） =====
+// 寸法：スキットル・モルック棒とも直径55mm、モルック棒の長さ220mm（03_モルック研究所/モルック用具の寸法データ）
+// 「間隔」はすき間（ふち〜ふち）。数値はmm、x=左右、y=奥行き（奥がプラス）。
+const SKD=55,MBL=220,ROW=55*Math.sqrt(3)/2;
+const LAYOUTS={
+ "1-1":{marks:[{m:4,l:"4m",c:"g"},{m:6,l:"6m",c:"g"},{m:8,l:"8m",c:"g"}],pieces:[{x:0,y:0,t:"g"}],gap:"狙う1本を 4m→6m→8m に置き直す"},
+ "1-2":{marks:[{m:3.5,l:"3.5m",c:"g"},{m:4,l:"4m",c:"g"},{m:4.5,l:"4.5m",c:"g"}],pieces:[{x:-110,y:0,t:"w"},{x:0,y:0,t:"g"},{x:110,y:0,t:"w"}],gap:"間隔：スキットル1本の太さ分（5.5cm）"},
+ "1-3":{marks:[{m:4,l:"4m",c:"g"},{m:4.5,l:"4.5m",c:"g"},{m:5,l:"5m",c:"g"}],pieces:[{x:0,y:0,t:"g"},{x:0,y:275,t:"w"}],gap:"間隔：モルック棒1本分（22cm）"},
+ "1-4":{marks:[{m:4,l:"4m",c:"g"},{m:5,l:"5m",c:"g"},{m:6,l:"6m",c:"g"}],lines:[{m:8,l:"8mライン"},{m:9,l:"9mライン"},{m:10,l:"10mライン"}],note:"4m→8m、5m→9m、6m→10m。立てたときに、指定のラインに少しでもかかればOK"},
+ "1-5":{marks:[{m:3.5,l:"3.5m",c:"t",sub:"モルック棒"},{m:3.775,c:"g"}],pieces:[{x:-27.5,y:-275,t:"s"},{x:27.5,y:-275,t:"s"},{x:0,y:0,t:"g"}],gap:"間隔：モルック棒1本分（22cm）",note:"狙うスキットルの前にモルック棒を2本立てる。棒に当たったらミス"},
+ "2-1":{marks:[{m:3.5,l:"3.5m",c:"w",sub:"一番手前"}],pieces:[{x:0,y:0,t:"w"},{x:-110,y:110,t:"w"},{x:0,y:110,t:"g"},{x:110,y:110,t:"w"}],gap:"間隔：モルック棒の太さ分（5.5cm）"},
+ "2-2":{marks:[{m:4,l:"4m",c:"g"}],pieces:[{t:"ring",x:0,y:0,r:MBL/2},{x:0,y:0,t:"g"},{t:"bar",x1:-110,y1:-200,x2:110,y2:-200}],gap:"円：直径＝モルック棒1本分（22cm）",note:"スキットル（立てた状態）とモルック棒が、円の中か線にかかっていればOK"},
+ "2-3":{marks:[{m:3.5,l:"3.5m",c:"w",sub:"壁スキットル"},{m:4.5,l:"4.5m",c:"g"}],lines:[{m:8,l:"8mライン"}],note:"壁を越えて、4.5mの対象を8mラインまで飛ばす。立てたときに少しでもかかればOK。壁を倒したらミス"},
+ "2-4":{marks:[{m:10,l:"10m",c:"g"}],pieces:[{x:0,y:0,t:"g"}],gap:"1本だけ"},
+ "3-1":{marks:[{m:4,l:"4m",c:"g"}],pieces:[{t:"bar",x1:0,y1:150,x2:0,y2:-150,guide:1},{t:"bar",x1:0,y1:-150,x2:150,y2:-150,guide:1},{x:0,y:150,t:"w"},{x:0,y:0,t:"g"},{x:150,y:-150,t:"w"}],gap:"間隔：スキットル1本分（15cm）",note:"寝かせたスキットルの斜めの面を合わせて直角をつくり、間隔を測る。左右対称の配置もあります（左右1回ずつクリアが必要）"},
+ "3-2":{marks:[{m:12,l:"12m",c:"g"}],pieces:[{x:0,y:0,t:"g"}],gap:"1本だけ"},
+ "3-3":{marks:[{m:3.5,l:"3.5m",c:"w",sub:"一番手前"}],pieces:[{x:0,y:0,t:"w"},{x:27.5,y:Math.sqrt(55*55-27.5*27.5),t:"g"}],gap:"くっつけて、半分だけ見える",note:"左右対称の配置もあります（左右1回ずつクリアが必要）"},
+ "3-4":{marks:[{m:7,l:"7m",c:"g"}],pieces:[{x:0,y:-165,t:"w"},{x:0,y:0,t:"g"}],gap:"間隔：スキットル2本分（11cm）"},
+ "final":{marks:[{m:3.5,l:"3.5m",c:"w",sub:"初期配置"}],pieces:[[1,-27.5,0],[2,27.5,0],[3,-55,1],[10,0,1],[4,55,1],[5,-82.5,2],[11,-27.5,2],[12,27.5,2],[6,82.5,2],[7,-55,3],[9,0,3],[8,55,3]].map(([n,x,r])=>({x,y:r*ROW,t:"w",n})),gap:"通常の試合と同じ12本",note:"50点ちょうどでゴール。超えたら25点。3回連続ミス・1分10秒超えで失格"}
+};
+const RB={bg:"#151d38",panel:"#1c2547",line:"#8a93b0",mute:"#9aa2bd",fg:"#f4f4f6",gold:"#f0b429",red:"#e0202f",tan:"#d9b98a"};
+const colOf=c=>c==="g"?RB.gold:c==="t"?RB.tan:RB.fg;
+function layoutSVG(code){
+  const L=LAYOUTS[code];const W=340,H=300,ax=62,yb=258,yt=26;
+  const maxM=Math.ceil(Math.max(...L.marks.map(m=>m.m),...(L.lines||[]).map(l=>l.m))+1);
+  const sy=m=>yb-(yb-yt)*m/maxM;
+  let o=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${code}の配置図（縮尺どおり）" font-family='"Zen Kaku Gothic New","Hiragino Sans",sans-serif'>`;
+  o+=`<line x1="${ax}" y1="${yb}" x2="${ax}" y2="${yt-6}" stroke="${RB.line}" stroke-width="2"/><path d="M${ax-6} ${yt}L${ax} ${yt-12}L${ax+6} ${yt}Z" fill="${RB.line}"/>`;
+  for(let m=1;m<maxM;m++){const y=sy(m);o+=`<line x1="${ax-3}" y1="${y}" x2="${ax+3}" y2="${y}" stroke="${RB.line}" stroke-width="1" opacity=".55"/>`}
+  (L.lines||[]).forEach(l=>{const y=sy(l.m);o+=`<line x1="${ax-34}" y1="${y}" x2="${L.pieces?ax+70:ax+150}" y2="${y}" stroke="${RB.gold}" stroke-width="2" stroke-dasharray="7 6"/><text x="${L.pieces?ax+74:ax+156}" y="${y+4}" fill="${RB.gold}" font-size="11" font-weight="900">${l.l}</text>`});
+  L.marks.forEach(mk=>{const y=sy(mk.m),c=colOf(mk.c);o+=`<circle cx="${ax}" cy="${y}" r="4.5" fill="${c}" stroke="${RB.bg}" stroke-width="1.5"/>`;
+    if(mk.l)o+=`<text x="${ax-10}" y="${y+4.5}" text-anchor="end" fill="${c}" font-size="13" font-weight="900">${mk.l}</text>`;
+    if(mk.sub)o+=`<text x="${ax+9}" y="${y+4}" fill="${c}" font-size="10" font-weight="700">${mk.sub}</text>`});
+  o+=`<rect x="${ax-34}" y="${yb+8}" width="68" height="20" rx="4" fill="${RB.red}"/><text x="${ax}" y="${yb+22}" text-anchor="middle" fill="${RB.fg}" font-size="11" font-weight="900">モルッカーリ</text>`;
+  if(L.pieces){
+    const bx=150,by=26,bw=180,bh=190;
+    o+=`<rect x="${bx}" y="${by}" width="${bw}" height="${bh}" rx="8" fill="none" stroke="${RB.line}" stroke-width="1.2" opacity=".8"/><text x="${bx+8}" y="${by+15}" fill="${RB.mute}" font-size="9.5" font-weight="700">配置の拡大（上から見た図）</text>`;
+    const pts=[];L.pieces.forEach(p=>{if(p.t==="ring")pts.push([p.x-p.r,p.y-p.r],[p.x+p.r,p.y+p.r]);else if(p.t==="bar")pts.push([p.x1,p.y1],[p.x2,p.y2]);else pts.push([p.x,p.y])});
+    const pad=SKD/2+10,minX=Math.min(...pts.map(p=>p[0]))-pad,maxX=Math.max(...pts.map(p=>p[0]))+pad,minY=Math.min(...pts.map(p=>p[1]))-pad,maxY=Math.max(...pts.map(p=>p[1]))+pad;
+    const aw=bw-24,ah=bh-58,s=Math.min(aw/(maxX-minX),ah/(maxY-minY),0.6);
+    const cx=bx+bw/2-((minX+maxX)/2)*s,cy=by+24+ah/2+((minY+maxY)/2)*s;
+    const X=x=>cx+x*s,Y=y=>cy-y*s;
+    L.pieces.forEach(p=>{
+      if(p.t==="ring")o+=`<circle cx="${X(p.x)}" cy="${Y(p.y)}" r="${p.r*s}" fill="none" stroke="${RB.gold}" stroke-width="2"/>`;
+      else if(p.t==="bar"){const w=SKD*s;o+=`<line x1="${X(p.x1)}" y1="${Y(p.y1)}" x2="${X(p.x2)}" y2="${Y(p.y2)}" stroke="${RB.tan}" stroke-width="${w}" stroke-linecap="${p.guide?"square":"round"}" opacity="${p.guide?.55:1}"/>`}
+      else{const r=SKD/2*s,f=p.t==="g"?RB.gold:p.t==="s"?RB.tan:RB.fg;o+=`<circle cx="${X(p.x)}" cy="${Y(p.y)}" r="${r}" fill="${f}" stroke="${RB.bg}" stroke-width="1"/>`;
+        if(p.n)o+=`<text x="${X(p.x)}" y="${Y(p.y)+r*0.38}" text-anchor="middle" font-size="${r*1.05}" font-weight="900" fill="${RB.bg}">${p.n}</text>`}});
+    const sb=100*s,sx=bx+12,syb=by+bh-14;
+    o+=`<line x1="${sx}" y1="${syb}" x2="${sx+sb}" y2="${syb}" stroke="${RB.mute}" stroke-width="2"/><line x1="${sx}" y1="${syb-4}" x2="${sx}" y2="${syb+4}" stroke="${RB.mute}"/><line x1="${sx+sb}" y1="${syb-4}" x2="${sx+sb}" y2="${syb+4}" stroke="${RB.mute}"/><text x="${sx+sb+6}" y="${syb+4}" fill="${RB.mute}" font-size="9.5" font-weight="700">10cm</text>`;
+    const gl=(L.gap||"").length;o+=`<text x="${bx+bw/2}" y="${by+bh+20}" text-anchor="middle" fill="${RB.fg}" font-size="${gl>15?Math.max(8.5,170/gl):11.5}" font-weight="900">${esc(L.gap||"")}</text>`;
+    o+=`<circle cx="${bx+30}" cy="${by+bh+42}" r="5" fill="${RB.gold}"/><text x="${bx+40}" y="${by+bh+46}" fill="${RB.fg}" font-size="11" font-weight="700">狙う</text><circle cx="${bx+92}" cy="${by+bh+42}" r="5" fill="${RB.fg}"/><text x="${bx+102}" y="${by+bh+46}" fill="${RB.fg}" font-size="11" font-weight="700">倒さない</text>`;
+  }
+  return o+`</svg>`;
+}
+function layoutPanel(code){
+  const e=code==="final"?{code:"FINAL",name:"タイムアタック50"}:evByCode(code);const L=LAYOUTS[code];
+  const miss=code==="final"?"1分10秒以内":`ミスは${e.miss}回まで`;
+  return`<section class="lay"><div class="layhead"><b>${e.code}</b><span>${esc(e.name)}</span><em>${miss}</em></div>${layoutSVG(code)}${L.note?`<p class="laynote">${esc(L.note)}</p>`:""}</section>`;
+}
+const FIGS=[...ALL_EVENTS.map(e=>({key:e.code,label:`${e.code} ${e.name}`})),{key:"final",label:"FINAL タイムアタック50"},
+  {key:"layout-1st",label:"配置一覧 1st"},{key:"layout-2nd",label:"配置一覧 2nd"},{key:"layout-3rd",label:"配置一覧 3rd"}];
+const ICON_FIG=`<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M8 1.5v13"/><circle cx="8" cy="4" r="1.6" fill="currentColor"/><circle cx="4.5" cy="9" r="1.2"/><circle cx="11.5" cy="9" r="1.2"/></svg>`;
+const figBtn=key=>`<button class="figbtn" data-fig="${key}">${ICON_FIG}配置図を見る</button>`;
+function figBody(key){if(key.startsWith("layout-")){const s=STAGES.find(x=>x.id===key.slice(7));return s.events.map(e=>layoutPanel(e.code)).join("")}return layoutPanel(key)}
+function showFig(key){
+  const group=key.startsWith("layout")?FIGS.filter(f=>f.key.startsWith("layout")):FIGS.filter(f=>!f.key.startsWith("layout"));
+  let i=Math.max(0,group.findIndex(f=>f.key===key));
+  const el=document.createElement("div");el.className="sheet";el.setAttribute("role","dialog");el.setAttribute("aria-modal","true");
+  const draw=()=>{const f=group[i];el.setAttribute("aria-label",f.label);
+    el.innerHTML=`<div class="bar"><span>${esc(f.label)}</span><button data-close>閉じる</button></div>
+    <div class="lays">${figBody(f.key)}<p class="scale-note">縮尺どおり（スキットル・モルック棒の直径5.5cm、モルック棒の長さ22cm）。距離の軸もモルッカーリからの実際の比率です。</p></div>
+    <div class="nav"><button data-prev ${i?"":"disabled"}>← ${i?esc(group[i-1].label):""}</button><button data-next ${i<group.length-1?"":"disabled"}>${i<group.length-1?esc(group[i+1].label):""} →</button></div>`;
+    el.querySelector("[data-close]").onclick=close;
+    el.querySelector("[data-prev]").onclick=()=>{if(i>0){i--;draw();el.scrollTop=0}};    el.querySelector("[data-next]").onclick=()=>{if(i<group.length-1){i++;draw();el.scrollTop=0}};
+    el.querySelector("[data-close]").focus()};
+  const close=()=>{el.remove();document.removeEventListener("keydown",onKey)};
+  const onKey=ev=>{if(ev.key==="Escape")close()};
+  document.addEventListener("keydown",onKey);
+  document.body.appendChild(el);draw();
+}
+document.addEventListener("click",ev=>{const b=ev.target.closest("[data-fig]");if(b)showFig(b.dataset.fig)});
+
+// ===== Xで共有（成績を画像カードにする） =====
+const NAME_KEY="mosuke_self_name";
+const getName=()=>{try{return localStorage.getItem(NAME_KEY)||""}catch(e){return""}};
+const setName=v=>{try{localStorage.setItem(NAME_KEY,v)}catch(e){}};
+const CW=1080,CH=1350;
+const K={bg:"#151d38",head:"#1c2547",panel:"#26305a",line:"#2e3863",fg:"#f4f4f6",mute:"#9aa2bd",red:"#e0202f",gold:"#f0b429",ng:"#55608a"};
+const FD='"Anton","Impact",sans-serif',FB='"Zen Kaku Gothic New","Hiragino Sans","Noto Sans JP",sans-serif';
+const dayKey=t=>new Date(t).toDateString();
+const ymd=t=>{const d=new Date(t);return`${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,"0")}.${String(d.getDate()).padStart(2,"0")}`};
+const pct=(c,n)=>n?Math.round(c/n*100):0;
+const evName=code=>code==="FINAL"?"タイムアタック50":evByCode(code).name;
+
+function statsCard(period){
+  const today=dayKey(Date.now());
+  const th=DB.throws.filter(x=>x.code!=="FINAL"&&(period==="all"||dayKey(x.t)===today));
+  const rows=ALL_EVENTS.map(e=>{const a=th.filter(x=>x.code===e.code),c=a.filter(x=>x.ok).length;return{code:e.code,name:e.name,n:a.length,c,rate:a.length?c/a.length:null}});
+  const fins=(DB.finals||[]).filter(f=>f.win&&(period==="all"||dayKey(f.t)===today));
+  return{kind:"stats",period,rows,n:th.length,c:th.filter(x=>x.ok).length,best:fins.length?Math.min(...fins.map(f=>f.time)):null};
+}
+function shareText(card,name){
+  const tag="\n#MöSUKE #モルック";
+  if(card.kind==="stats"){
+    const has=card.rows.filter(r=>r.n>=3).length?card.rows.filter(r=>r.n>=3):card.rows.filter(r=>r.n);
+    const s=[...has].sort((a,b)=>b.rate-a.rate);
+    let t=card.mode==="sheet"?`MöSUKE成績表チャレンジ（各${card.per}投）\n総合 ${card.c}/${card.n}（${pct(card.c,card.n)}%）`:`MöSUKEセルフ練習【${card.period==="today"?"今日":"通算"}】\n総合成功率 ${pct(card.c,card.n)}%（${card.n}投）`;
+    if(s.length>1)t+=`\n得意：${s[0].code} ${s[0].name} ${Math.round(s[0].rate*100)}%\n苦手：${s[s.length-1].code} ${s[s.length-1].name} ${Math.round(s[s.length-1].rate*100)}%`;
+    if(card.best!=null)t+=`\nFINAL最速 ${card.best.toFixed(1)}秒`;
+    if(card.final&&!card.final.skip)t+=card.final.win?`\nFINAL ${card.final.time.toFixed(1)}秒`:`\nFINAL 失格`;
+    return t+tag}
+  if(card.kind==="run")return`MöSUKEセルフ練習【${card.label}】\n${card.head}${card.time?` ${card.time}秒`:""}\n${card.n}投・成功${card.c}（${pct(card.c,card.n)}%）`+tag;
+  const c=card.session.filter(x=>x.ok).length;
+  return`MöSUKEセルフ練習【${card.code} ${card.name}】\n${c}/${card.session.length}（${pct(c,card.session.length)}%）`+tag;
+}
+function fitFont(g,text,maxW,size,weight,fam){let s=size;do{g.font=`${weight} ${s}px ${fam}`;if(g.measureText(text).width<=maxW)break;s-=2}while(s>14);return s}
+function clip(g,text,maxW){if(g.measureText(text).width<=maxW)return text;let t=text;while(t.length>1&&g.measureText(t+"…").width>maxW)t=t.slice(0,-1);return t+"…"}
+async function drawCard(card,name){
+  const all=JSON.stringify(card)+name+"MöSUKESELFTRAINING総合成功率投成功今日の練習通算成績得意苦手最速秒失格中断敗退ミスセルフ練習の記録0123456789.%/";
+  try{await Promise.all([document.fonts.load(`96px Anton`,all),document.fonts.load(`700 30px "Zen Kaku Gothic New"`,all),document.fonts.load(`900 30px "Zen Kaku Gothic New"`,all)])}catch(e){}
+  const cv=document.createElement("canvas");cv.width=CW;cv.height=CH;const g=cv.getContext("2d");
+  const L=56,R=CW-56;
+  g.fillStyle=K.bg;g.fillRect(0,0,CW,CH);g.textBaseline="alphabetic";
+  g.fillStyle=K.head;g.fillRect(0,0,CW,204);
+  g.fillStyle=K.fg;g.font=`900 68px ${FB}`;g.fillText("MöSUKE 成績表",L,100);
+  const sub=card.kind==="stats"?card.mode==="sheet"?`成績表チャレンジ（各${card.per}投）`:(card.period==="today"?"今日のセルフ練習":"セルフ練習 通算"):card.kind==="run"?card.label:"種目練習";
+  g.fillStyle=K.gold;fitFont(g,sub,600,46,900,FB);g.fillText(sub,L,166);
+  g.textAlign="right";g.fillStyle=K.mute;g.font=`36px ${FD}`;g.fillText(ymd(Date.now()),R,96);
+  if(name){g.fillStyle=K.fg;fitFont(g,name,340,42,900,FB);g.fillText(name,R,164)}
+  g.textAlign="left";
+  g.fillStyle=K.red;g.fillRect(0,206,CW,12);g.fillStyle=K.gold;g.fillRect(0,224,CW,6);
+  const bar=(y,rate,w,x0)=>{g.fillStyle=K.panel;g.fillRect(x0,y,w,14);if(rate!=null){g.fillStyle=rate>=.8?K.gold:K.fg;g.fillRect(x0,y,Math.max(3,w*rate),14)}};
+  if(card.kind==="stats"){
+    g.fillStyle=K.mute;g.font=`700 30px ${FB}`;g.fillText(card.mode==="sheet"?"総合":"総合成功率",L,300);
+    g.fillStyle=K.fg;g.font=`170px ${FD}`;const big=card.n?pct(card.c,card.n)+"%":"—";g.fillText(big,L,465);
+    const bx=L+g.measureText(big).width+40;g.font=`64px ${FD}`;g.fillText(`${card.n}`,bx,395);const nw=g.measureText(`${card.n}`).width;g.font=`700 30px ${FB}`;g.fillStyle=K.mute;g.fillText(`投・成功${card.c}`,bx+nw+10,393);
+    if(card.final&&!card.final.skip){g.fillStyle=card.final.win?K.gold:K.mute;g.font=`700 30px ${FB}`;g.fillText("FINAL",bx,458);const fw=g.measureText("FINAL").width;g.font=card.final.win?`52px ${FD}`:`900 40px ${FB}`;g.fillText(card.final.win?card.final.time.toFixed(1)+"秒":"失格",bx+fw+16,card.final.win?462:460)}
+    if(card.best!=null){g.fillStyle=K.gold;g.font=`700 30px ${FB}`;g.fillText("FINAL最速",bx,458);const fw=g.measureText("FINAL最速").width;g.font=`52px ${FD}`;g.fillText(card.best.toFixed(1)+"秒",bx+fw+16,462)}
+    let y=535;let prev="";
+    card.rows.forEach(r=>{const st=r.code[0];if(prev&&st!==prev){g.fillStyle=K.line;g.fillRect(L,y-34,R-L,2);y+=10}prev=st;
+      g.fillStyle=r.n?K.red:K.ng;g.font=`34px ${FD}`;g.fillText(r.code,L,y);
+      g.fillStyle=r.n?K.fg:K.ng;g.font=`700 28px ${FB}`;g.fillText(clip(g,r.name,340),L+84,y);
+      bar(y-16,r.rate,330,500);
+      g.textAlign="right";g.fillStyle=r.n?K.fg:K.ng;g.font=`38px ${FD}`;g.fillText(r.n?Math.round(r.rate*100)+"%":"—",948,y+2);
+      g.fillStyle=K.mute;g.font=`700 22px ${FB}`;g.fillText(card.mode==="sheet"?(r.skip?"とばし":`${r.c}/${r.n}`):`${r.n}投`,R,y);g.textAlign="left";y+=54});
+  }else if(card.kind==="run"){
+    g.fillStyle=card.win?K.gold:K.fg;const hs=fitFont(g,card.head,R-L,104,900,FB);g.fillText(card.head,L,250+hs+20);
+    g.fillStyle=K.mute;g.font=`700 34px ${FB}`;g.fillText(`${card.time?`タイム ${card.time}秒・`:""}${card.n}投・成功${card.c}（${pct(card.c,card.n)}%）`,L,460);
+    let y=540;const rh=card.hist.length>12?50:56;
+    card.hist.forEach(h=>{g.fillStyle=K.red;g.font=`32px ${FD}`;g.fillText(h.code,L,y);
+      g.fillStyle=K.fg;g.font=`700 28px ${FB}`;g.fillText(clip(g,evName(h.code),520),L+120,y);
+      g.textAlign="right";
+      if(h.code==="FINAL"){g.fillStyle=h.ok?K.gold:K.mute;g.font=h.ok?`36px ${FD}`:`900 30px ${FB}`;g.fillText(h.ok?`${h.time}秒`:"失格",R,y)}
+      else{g.fillStyle=h.ok?K.gold:K.mute;g.font=h.ok?`36px ${FD}`:`900 30px ${FB}`;g.fillText(h.ok?"CLEAR":"失敗",R-130,y);g.fillStyle=K.mute;g.font=`700 24px ${FB}`;g.fillText(`ミス${h.misses}`,R,y)}
+      g.textAlign="left";y+=rh});
+    if(!card.hist.length){g.fillStyle=K.mute;g.font=`700 30px ${FB}`;g.fillText("1種目目の途中で終了",L,y)}
+  }else{
+    const ss=card.session,c=ss.filter(x=>x.ok).length;
+    g.fillStyle=K.red;g.font=`48px ${FD}`;g.fillText(card.code,L,320);
+    g.fillStyle=K.fg;fitFont(g,card.name,R-L-110,64,900,FB);g.fillText(card.name,L+110,322);
+    g.font=`210px ${FD}`;g.fillText(`${c}/${ss.length}`,L,560);const w=g.measureText(`${c}/${ss.length}`).width;
+    g.fillStyle=pct(c,ss.length)>=80?K.gold:K.fg;g.font=`110px ${FD}`;g.fillText(pct(c,ss.length)+"%",L+w+40,560);
+    let y=660;
+    card.targets.forEach(t=>{const a=ss.filter(x=>x.target===t);if(!a.length)return;const ac=a.filter(x=>x.ok).length;
+      g.fillStyle=K.fg;g.font=`40px ${FD}`;g.fillText(t,L,y);bar(y-18,ac/a.length,460,L+220);
+      g.textAlign="right";g.font=`40px ${FD}`;g.fillText(pct(ac,a.length)+"%",948,y+2);g.fillStyle=K.mute;g.font=`700 22px ${FB}`;g.fillText(`${ac}/${a.length}`,R,y);g.textAlign="left";y+=70});
+    y+=10;const per=20,sz=34,gap=14,dots=ss.slice(-120);
+    dots.forEach((d,i)=>{const cx=L+(i%per)*(sz+gap),cy=y+Math.floor(i/per)*(sz+gap);if(cy+sz>CH-110)return;g.fillStyle=d.ok?K.fg:K.ng;g.fillRect(cx,cy,sz,sz)});
+  }
+  g.fillStyle=K.red;g.fillRect(0,CH-28,CW,10);g.fillStyle=K.gold;g.fillRect(0,CH-12,CW,6);
+  g.fillStyle=K.mute;g.font=`700 26px ${FB}`;g.fillText("#MöSUKE  #モルック",L,CH-56);
+  g.textAlign="right";g.fillText("MöSUKE SELF TRAINING",R,CH-56);g.textAlign="left";
+  return new Promise(res=>cv.toBlob(b=>res(b),"image/png"));
+}
+const IS_IOS=/iPhone|iPad|iPod/.test(navigator.userAgent)||(navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1);
+const blobToDataURL=b=>new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=rej;r.readAsDataURL(b)});
+// iPhone：ボタン保存だと「ファイル」アプリに入るので、画像を大きく出して長押し→「写真に追加」してもらう
+function photoView(src){
+  const v=document.createElement("div");v.className="photoview";v.setAttribute("role","dialog");v.setAttribute("aria-modal","true");v.setAttribute("aria-label","写真に保存");
+  v.innerHTML=`<p class="pv-tip"><b>画像を長押し</b> →「写真に追加」<br><small>写真アプリに保存されます</small></p><img src="${src}" alt="MöSUKE成績表の画像"><button class="pv-close" data-pv-close>保存できたら閉じる</button>`;
+  document.body.appendChild(v);v.querySelector("[data-pv-close]").onclick=()=>v.remove();v.querySelector("[data-pv-close]").focus();
+}
+async function openShare(card){
+  let period=card.kind==="stats"?card.period:null,blob=null,url=null,saved=false;
+  const el=document.createElement("div");el.className="sheet sharesheet";el.setAttribute("role","dialog");el.setAttribute("aria-modal","true");el.setAttribute("aria-label","Xで共有");
+  el.innerHTML=`<div class="bar"><span>Xで共有</span><button data-close>閉じる</button></div>
+  <div class="share">
+    ${period?`<div class="chips"><button class="chip" data-per="today">今日</button><button class="chip" data-per="all">通算</button></div>`:""}
+    <label class="fld"><span>画像に入れる名前（空欄なら入れない）</span><input id="share-name" maxlength="20" placeholder="例：もるまさ" autocomplete="nickname"></label>
+    <figure class="cardwrap"><img class="card" alt="MöSUKE成績表の画像"><figcaption id="save-tip" ${IS_IOS?"":"hidden"}>${IS_IOS?"画像を長押し →「写真に追加」で写真アプリに保存":""}</figcaption></figure>
+    <button class="ghost" data-filesave hidden>ファイルとして保存（「ファイル」アプリ）</button>
+    <details class="txt"><summary>投稿文を見る・直す</summary>
+      <label class="fld"><span>Xの投稿画面に入る文章</span><textarea id="share-text" rows="6"></textarea></label>
+      <button class="ghost" data-copy>投稿文をコピー</button></details>
+  </div>
+  <div class="savebar">
+    <button class="savebtn" data-save disabled><span class="ic" aria-hidden="true">↓</span><span class="lb">画像を用意しています…</span></button>
+    <a class="xopen" target="_blank" rel="noopener" data-x><b>X</b>を開く</a>
+  </div>`;
+  document.body.appendChild(el);
+  const q=s=>el.querySelector(s),img=q("img.card"),ta=q("#share-text"),nameIn=q("#share-name"),xa=q("[data-x]"),sv=q("[data-save]"),tip=q("#save-tip");
+  const setLabel=t=>{sv.querySelector(".lb").textContent=t};
+  nameIn.value=getName();
+  const setX=()=>{xa.href="https://x.com/intent/post?text="+encodeURIComponent(ta.value)};
+  let dl=null,dlReady=false;
+  const markSaved=()=>{saved=true;sv.classList.add("done");sv.querySelector(".ic").textContent="✓";setLabel(IS_IOS?"もう一度ひらく":"保存しました（もう一度）");xa.classList.add("next");xa.innerHTML="次：<b>X</b>を開いて添付"};
+  const fs=q("[data-filesave]");
+  const refreshBtn=()=>{if(!blob)return;
+    if(IS_IOS){sv.disabled=false;if(!saved)setLabel("写真に保存する");if(dl&&dlReady)fs.hidden=false;return}
+    if(dl||!window.claude){sv.disabled=false;if(!saved)setLabel("画像を保存")}
+    else if(dlReady){sv.disabled=false;sv.classList.add("alt");setLabel("保存のしかた");tip.hidden=false;tip.textContent="画像を長押し →「“写真”に保存」（PCは右クリック →「画像を保存」）"}};
+  let seq=0;
+  const render=async(resetText)=>{const my=++seq;const cd=period?statsCard(period):card;
+    if(period)el.querySelectorAll("[data-per]").forEach(b=>b.setAttribute("aria-pressed",b.dataset.per===period));
+    if(resetText){ta.value=shareText(cd,nameIn.value.trim());setX()}
+    sv.disabled=true;
+    const b=await drawCard(cd,nameIn.value.trim());if(my!==seq||!b)return;
+    blob=b;url=await blobToDataURL(b);if(my!==seq)return;img.src=url;
+    if(saved){saved=false;sv.classList.remove("done");sv.querySelector(".ic").textContent="↓";xa.classList.remove("next");xa.innerHTML="<b>X</b>を開く"}
+    refreshBtn()};
+  const doSave=async()=>{if(!blob)return;
+    if(!dl&&!window.claude){const a=document.createElement("a");a.href=url;a.download=`MoSUKE_seisekihyo_${ymd(Date.now()).replace(/\./g,"")}.png`;document.body.appendChild(a);a.click();a.remove();return markSaved()}
+    if(!dl){tip.hidden=false;tip.classList.add("flash");setTimeout(()=>tip.classList.remove("flash"),900);return}
+    const d=new Date();const stamp=`${d.getFullYear()}${String(d.getMonth()+1).padStart(2,"0")}${String(d.getDate()).padStart(2,"0")}_${String(d.getHours()).padStart(2,"0")}${String(d.getMinutes()).padStart(2,"0")}`;
+    setLabel("保存画面を開いています…");
+    try{await dl.save({filename:`MoSUKE_seisekihyo_${stamp}.png`,data:blob});markSaved()}
+    catch(e){const code=e&&e.code;
+      if(code==="declined")setLabel("画像を保存");
+      else if(code==="rate_limited")setLabel("少し待ってからもう一度");
+      else{dl=null;sv.classList.add("alt");setLabel("保存のしかた");tip.hidden=false;tip.textContent="ここではボタンで保存できません。画像を長押しして保存してください"}}};
+  const close=()=>{el.remove();document.removeEventListener("keydown",onKey)};
+  const onKey=ev=>{if(ev.key==="Escape")close()};document.addEventListener("keydown",onKey);
+  q("[data-close]").onclick=close;
+  sv.onclick=()=>{if(IS_IOS){if(url){photoView(url);markSaved()}}else doSave()};
+  img.onclick=()=>{if(IS_IOS){if(url)photoView(url)}else if(dl)doSave()};
+  fs.onclick=doSave;
+  xa.addEventListener("click",()=>{try{navigator.clipboard.writeText(ta.value).catch(()=>{})}catch(e){}});
+  el.querySelectorAll("[data-per]").forEach(b=>b.onclick=()=>{period=b.dataset.per;render(true)});
+  let tm=null;nameIn.oninput=()=>{setName(nameIn.value.trim());clearTimeout(tm);tm=setTimeout(()=>render(false),250)};
+  ta.oninput=setX;
+  q("[data-copy]").onclick=async ev=>{try{await navigator.clipboard.writeText(ta.value);ev.target.textContent="コピーしました"}catch(e){ta.focus();ta.select();ev.target.textContent="選択しました。コピーしてください"}};
+  render(true);
+  try{dl=window.claude&&window.claude.use?await window.claude.use("downloads"):null}catch(e){dl=null}
+  dlReady=true;refreshBtn();
+}
+
+// ===== ホーム =====
+function home(){
+  stopTimer();
+  const sp=sheetPref();
+  const ev=s=>s.events.map(e=>{const st=stat(e.code);return`<button class="evrow" data-ev="${e.code}"><span class="code">${e.code}</span><span class="nm">${esc(e.name)}<em>${esc(e.kind)}・${e.targets.join(" / ")}</em></span><span class="rate">${st.rate==null?"—":st.rate+"%"}<small>${st.n}投</small></span></button>`}).join("");
+  const hist=DB.runs.slice(0,8).map(r=>`<div class="hrow"><span>${fmtDate(r.t)}　${esc(r.label)}</span><span class="res ${r.win?"win":"lose"}">${esc(r.result)}</span></div>`).join("");
+  app.innerHTML=band()+`
+  <section class="sec"><h2>本番どおりに挑戦 <small>ミスの上限で止まる</small></h2>
+    <div class="stages">
+      <button class="stbtn all" data-run="all"><b>全ステージ通し</b><span>1st → 2nd → 3rd → FINAL</span></button>
+      ${STAGES.map(s=>`<button class="stbtn" data-run="${s.id}"><b>${s.name}</b><span>${esc(s.note)}</span></button>`).join("")}
+    </div>
+    <div class="figlinks">配置一覧：<button class="chip" data-fig="layout-1st">1st</button><button class="chip" data-fig="layout-2nd">2nd</button><button class="chip" data-fig="layout-3rd">3rd</button><button class="chip" data-fig="final">FINAL</button></div></section>
+  <section class="sec"><h2>成績表を作る <small>全13種目を同じ数ずつ投げる</small></h2>
+    ${DB.sheetDraft?`<button class="stbtn all" data-sheet-resume><b>続きから</b><span>${Math.min(DB.sheetDraft.ei,13)}/13種目まで済み・各${DB.sheetDraft.per}投（${ymd(DB.sheetDraft.t)}）</span></button>`:""}
+    <div class="sheetset"><span>1種目</span>${[3,5,10].map(n=>`<button class="chip" data-per="${n}" aria-pressed="${n===sp.per}">${n}投</button>`).join("")}
+      <label class="chk"><input type="checkbox" id="sheet-final" ${sp.final?"checked":""}> 最後にFINALも1回</label></div>
+    <button class="btn pri" data-sheet-start>${DB.sheetDraft?"新しく":""}成績表スタート（全<span id="sheet-total">${13*sp.per}</span>投）</button>
+    <p class="hint">距離・左右が複数ある種目は、1投ごとに順番に回します（1-1なら 4m→6m→8m→4m…）。終わると成績表の画像をXで共有できます。</p>
+  </section>
+  <section class="sec"><h2>種目だけ練習 <small>好きなだけ投げる・成功率を記録</small></h2>
+    <div class="evlist">${STAGES.filter(s=>s.events.length).map(s=>`<div class="stagehead">${s.name}</div>${ev(s)}`).join("")}</div>
+  </section>
+  <section class="sec"><h2>挑戦の記録</h2>
+    <button class="sharebtn" data-share-stats>MöSUKE成績表をXで共有</button>
+    <div class="hist">${hist||`<div class="empty">まだ記録がありません。上の「本番どおりに挑戦」から始めると、どこまで進んだかがここに残ります。</div>`}</div>
+    <p class="hint">記録はこのスマホのブラウザにだけ保存されます（ほかの人や端末とは共有されません）。</p>
+    <div id="reset"><button class="danger" data-reset>記録をすべて消す</button></div>
+  </section>`;
+  app.querySelectorAll("[data-run]").forEach(b=>b.onclick=()=>startRun(b.dataset.run));
+  app.querySelectorAll("[data-ev]").forEach(b=>b.onclick=()=>practice(b.dataset.ev));
+  app.querySelectorAll("[data-per]").forEach(b=>b.onclick=()=>{sp.per=+b.dataset.per;setSheetPref(sp);app.querySelectorAll("[data-per]").forEach(x=>x.setAttribute("aria-pressed",x===b));document.getElementById("sheet-total").textContent=13*sp.per});
+  document.getElementById("sheet-final").onchange=ev=>{sp.final=ev.target.checked;setSheetPref(sp)};
+  app.querySelector("[data-sheet-start]").onclick=()=>startSheet(sp.per,sp.final);
+  const rs=app.querySelector("[data-sheet-resume]");if(rs)rs.onclick=resumeSheet;
+  app.querySelector("[data-share-stats]").onclick=()=>{const today=DB.throws.some(x=>x.code!=="FINAL"&&dayKey(x.t)===dayKey(Date.now()));openShare(statsCard(today?"today":"all"))};
+  app.querySelector("[data-reset]").onclick=()=>{document.getElementById("reset").innerHTML=`<div class="confirm">本当に消しますか？ <button class="btn" data-yes>消す</button><button class="btn" data-no>やめる</button></div>`;
+    app.querySelector("[data-yes]").onclick=()=>{DB={throws:[],runs:[],finals:[]};save();home()};app.querySelector("[data-no]").onclick=home};
+  window.scrollTo(0,0);
+}
+
+// ===== 本番モード =====
+let RUN=null;
+function startRun(which){
+  keepAwake();
+  const stages=which==="all"?STAGES.map(s=>s.id):[which];
+  RUN={which,stages,si:0,ei:0,hist:[],log:[]};
+  enterStage();
+}
+function curStage(){return STAGES.find(s=>s.id===RUN.stages[RUN.si])}
+function enterStage(){const s=curStage();if(s.id==="final")return finalScreen();RUN.ei=0;enterEvent()}
+function enterEvent(){RUN.ti=0;RUN.missed=0;RUN.undo=[];playScreen()}
+function playScreen(){
+  const s=curStage(),e=s.events[RUN.ei];
+  const pips=Array.from({length:e.miss},(_,i)=>`<span class="pip ${i<RUN.missed?"used":""} ${i===e.miss-1&&i>=RUN.missed?"last":""}"></span>`).join("");
+  const left=e.miss-RUN.missed;
+  app.innerHTML=band(`<button data-quit>やめる</button>`)+`<div class="play">
+    <div class="evtitle"><span class="code">${s.name}　${e.code}（${RUN.ei+1}/${s.events.length}）</span><span class="nm">${esc(e.name)}</span><span class="rule">${esc(e.kind)}｜${esc(e.rule)}</span></div>
+    ${figBtn(e.code)}
+    ${e.targets.length>1?`<div class="steps">${e.targets.map((t,i)=>`<div class="step ${i<RUN.ti?"done":i===RUN.ti?"cur":""}">${t}<small>${i<RUN.ti?"CLEAR":i===RUN.ti?"いまここ":""}</small></div>`).join("")}</div>`:""}
+    <div><div class="biglabel">${e.targets.length>1?"狙い":"クリアで次へ"}</div><div class="big">${e.targets[RUN.ti]}</div></div>
+    <div class="misses">${pips}<span class="misslabel">${left>0?`あと${left}回ミスOK`:"次のミスで失敗"}</span></div>
+    <div class="actions"><button class="act miss" data-m>MISS</button><button class="act clear" data-c>CLEAR</button></div>
+    <div class="subacts"><button class="ghost" data-undo ${RUN.undo.length?"":"disabled"}>↶ 1投もどす</button><span class="ghost">設置ミス・風はノーカウントで投げ直し</span></div>
+  </div>`;
+  app.querySelector("[data-c]").onclick=()=>throwRun(true);
+  app.querySelector("[data-m]").onclick=()=>throwRun(false);
+  app.querySelector("[data-undo]").onclick=()=>{const u=RUN.undo.pop();if(!u)return;RUN.ti=u.ti;RUN.missed=u.missed;unlogThrow();RUN.log.pop();playScreen()};
+  app.querySelector("[data-quit]").onclick=()=>quitRun();
+}
+function throwRun(ok){
+  const e=curStage().events[RUN.ei];
+  RUN.undo.push({ti:RUN.ti,missed:RUN.missed});
+  logThrow(e.code,e.targets[RUN.ti],ok,"run");RUN.log.push({code:e.code,ok});
+  buzz(ok?30:[20,40,20]);
+  if(ok){RUN.ti++;if(RUN.ti>=e.targets.length){RUN.hist.push({code:e.code,ok:true,misses:RUN.missed});return nextEvent()}}
+  else{RUN.missed++;if(RUN.missed>e.miss){RUN.hist.push({code:e.code,ok:false,misses:RUN.missed});return eventFailed(e)}}
+  playScreen();
+}
+function nextEvent(){
+  const s=curStage();RUN.ei++;
+  if(RUN.ei<s.events.length)return enterEvent();
+  if(RUN.si<RUN.stages.length-1){return resultScreen({head:`${s.name}<br>CLEAR`,win:true,msg:"次のステージへ進みます。",btns:[["次へ："+STAGES.find(x=>x.id===RUN.stages[RUN.si+1]).name,()=>{RUN.si++;enterStage()},true],["ここで終える",()=>finishRun(`${s.name} クリア`,true)]]})}
+  finishRun(`${s.name} クリア`,true,true);
+}
+function eventFailed(e){
+  const s=curStage();
+  resultScreen({head:"そこまで！",win:false,msg:`${e.code} ${e.name}で失敗。本番なら${s.name}敗退です。`,btns:[
+    ["敗退として記録して終える",()=>finishRun(`${e.code}で敗退`,false),true],
+    ["この種目をもう一度",()=>{enterEvent()}],
+    ["練習として次の種目へ",()=>{RUN.practiceOn=true;nextEvent()}]]});
+}
+function quitRun(){
+  const s=curStage(),e=s.events[RUN.ei];
+  resultScreen({head:"中断",win:false,msg:"ここまでの投げは成功率に残ります。",btns:[["中断として記録して戻る",()=>finishRun(`${e?e.code:s.name}で中断`,false),true],["続ける",()=>s.id==="final"?finalScreen(true):playScreen()]]});
+}
+function finishRun(result,win,showSummary){
+  const label=RUN.which==="all"?"全ステージ通し":STAGES.find(s=>s.id===RUN.which).name;
+  addRun({label,result:result+(RUN.practiceOn?"（練習続行あり）":""),win:win&&!RUN.practiceOn});
+  const sum=RUN.hist.map(h=>{const e=evByCode(h.code);return`<div><span>${h.code} ${esc(e.name)}</span><span>${h.ok?"CLEAR":"失敗"}・ミス${h.misses}</span></div>`}).join("");
+  const n=RUN.log.length,c=RUN.log.filter(x=>x.ok).length;
+  const card={kind:"run",label,head:(win?result.replace(" クリア"," CLEAR"):result)+(RUN.practiceOn?"（練習続行）":""),win:win&&!RUN.practiceOn,n,c,hist:RUN.hist.slice()};
+  resultScreen({head:win?result.replace(" ","<br>"):"おつかれさま",win,msg:`${n}投・成功${c}（${n?Math.round(c/n*100):0}%）`,extra:sum?`<div class="summary">${sum}</div>`:"",btns:[["ホームへ",home,true],["成績表をXで共有",()=>openShare(card)]]});
+  RUN=null;
+}
+function resultScreen({head,win,msg,btns,extra}){
+  stopTimer();
+  app.innerHTML=band()+`<div class="result"><div class="head ${win?"win":""}">${head}</div><p>${esc(msg)}</p>${extra||""}<div class="btncol">${btns.map((b,i)=>`<button class="btn ${b[2]?"pri":""}" data-b="${i}">${esc(b[0])}</button>`).join("")}</div></div>`;
+  btns.forEach((b,i)=>app.querySelector(`[data-b="${i}"]`).onclick=b[1]);
+  window.scrollTo(0,0);
+}
+
+// ===== FINAL：タイムアタック50 =====
+let FIN=null;
+function finalScreen(resume){
+  if(!resume||!FIN)FIN={state:"ready",score:0,consec:0,start:0,end:0,hist:[],reached:0};
+  if(!RUN){RUN={which:"final",stages:["final"],si:0,hist:[],log:[]}}
+  drawFinal();
+}
+function remain(){const now=FIN.state==="done"?FIN.end:Date.now();return Math.max(0,FINAL_SEC*1000-(now-FIN.start))}
+function fmtT(ms){const s=ms/1000;return`${Math.floor(s/60)}:${String(Math.floor(s%60)).padStart(2,"0")}.${Math.floor(ms%1000/100)}`}
+function drawFinal(){
+  const st=FIN.state;
+  const pips=[0,1,2].map(i=>`<span class="pip ${i<FIN.consec?"used":""}"></span>`).join("");
+  let body="";
+  if(st==="ready")body=`<p class="hint">初期配置：3.5mに12本（通常の試合と同じ）。<br>50点ちょうどでゴール。超えたら25点。3回連続ミス・1分10秒超えで失格。</p><button class="start" data-start>START</button>`;
+  else if(st==="run")body=`<div class="pad">${Array.from({length:12},(_,i)=>`<button data-p="${i+1}">${i+1}</button>`).join("")}<button class="m" data-p="0">MISS</button><button class="u" data-undo ${FIN.hist.length?"":"disabled"}>↶ 1投もどす</button></div>`;
+  else if(st==="goal")body=`<p class="hint" style="text-align:center">50点！ スキットルを初期配置に戻して、モルッカーリに戻ったらタップ。</p><button class="goal" data-goal>GOAL</button>`;
+  app.innerHTML=band(`<button data-quit>やめる</button>`)+`<div class="play">
+    <div class="evtitle"><span class="code">FINAL</span><span class="nm">タイムアタック50</span></div>
+    ${st==="ready"?figBtn("final"):""}
+    <div><div class="timer" id="tm">${fmtT(st==="ready"?FINAL_SEC*1000:remain())}</div><div class="biglabel">残り時間</div></div>
+    <div class="score"><b>${FIN.score}</b><span>/ 50</span></div>
+    <div class="misses">${pips}<span class="misslabel">連続ミス ${FIN.consec}/3</span></div>
+    <div class="log">${FIN.hist.map(h=>h.p===0?"×":h.p).join(" ・ ")}${FIN.lastNote?`　${FIN.lastNote}`:""}</div>
+    ${body}</div>`;
+  const q=s=>app.querySelector(s);
+  q("[data-quit]").onclick=()=>{if(FIN.state==="ready"){if(RUN&&RUN.sheet){RUN=null;FIN=null;SHEET.final={skip:true};return sheetResult()}RUN=null;FIN=null;home()}else quitFinal()};
+  if(st==="ready")q("[data-start]").onclick=()=>{keepAwake();FIN.state="run";FIN.start=Date.now();tick();timerId=setInterval(tick,100);drawFinal();buzz(60)};
+  if(st==="run"){app.querySelectorAll("[data-p]").forEach(b=>b.onclick=()=>finThrow(+b.dataset.p));q("[data-undo]").onclick=finUndo}
+  if(st==="goal")q("[data-goal]").onclick=()=>{FIN.end=Date.now();FIN.state="done";stopTimer();finFinish(true)};
+}
+function tick(){const r=remain();const el=document.getElementById("tm");if(el){el.textContent=fmtT(r);el.classList.toggle("warn",r<=10000)}
+  if(r<=0&&(FIN.state==="run"||FIN.state==="goal")){FIN.end=FIN.start+FINAL_SEC*1000;FIN.state="done";stopTimer();buzz([100,60,100]);finFinish(false,"時間切れ")}}
+function finThrow(p){
+  FIN.hist.push({p,prev:FIN.score,consec:FIN.consec});FIN.lastNote="";
+  logThrow("FINAL",String(p),p>0,"run");RUN.log.push({code:"FINAL",ok:p>0});
+  if(p===0){FIN.consec++;buzz([20,40,20]);if(FIN.consec>=3){FIN.end=Date.now();FIN.state="done";stopTimer();return finFinish(false,"3回連続ミス")}}
+  else{FIN.consec=0;FIN.score+=p;buzz(30);if(FIN.score>50){FIN.score=25;FIN.lastNote="50超え→25点"}if(FIN.score===50){FIN.state="goal";FIN.reached=Date.now()}}
+  drawFinal();
+}
+function finUndo(){const h=FIN.hist.pop();if(!h)return;FIN.score=h.prev;FIN.consec=h.consec;FIN.lastNote="";unlogThrow();RUN.log.pop();drawFinal()}
+function quitFinal(){const was=FIN.state;stopTimer();
+  resultScreen({head:"中断",win:false,msg:"タイマーは止まりません。続けるなら「続ける」を押してください。",btns:[["中断として記録して戻る",()=>{FIN=null;if(RUN&&RUN.sheet){RUN=null;SHEET.final={skip:true};return sheetResult()}finishRun("FINALで中断",false)},true],["続ける",()=>{if(was==="run"||was==="goal")timerId=setInterval(tick,100);drawFinal();tick()}]]});
+}
+function finFinish(win,why){
+  const t=((FIN.end-FIN.start)/1000).toFixed(1);
+  if(RUN&&RUN.sheet){DB.finals=DB.finals||[];DB.finals.push({t:Date.now(),win,time:win?+t:null});SHEET.final=win?{win:true,time:+t}:{win:false,why};FIN=null;RUN=null;return sheetResult()}
+  RUN.hist.push({code:"FINAL",ok:win,misses:FIN.hist.filter(h=>h.p===0).length,time:win?t:null});
+  const n=FIN.hist.length;
+  FIN=null;
+  DB.finals=DB.finals||[];DB.finals.push({t:Date.now(),win,time:win?+t:null});save();
+  const label=RUN.which==="all"?"全ステージ通し":"FINAL";
+  const card={kind:"run",label,head:win?(RUN.which==="all"?(RUN.practiceOn?"FINAL CLEAR（練習続行）":"完全制覇"):"FINAL CLEAR"):`FINAL失格（${why}）`,win:win&&!RUN.practiceOn,n:RUN.log.length,c:RUN.log.filter(x=>x.ok).length,hist:RUN.hist.slice(),time:win?t:null};
+  if(win){addRun({label:RUN.which==="all"?"全ステージ通し":"FINAL",result:(RUN.which==="all"?"完全制覇 ":"FINALクリア ")+t+"秒",win:!RUN.practiceOn});
+    const head=RUN.which==="all"?"完全制覇":"FINAL<br>CLEAR";RUN=null;
+    return resultScreen({head,win:true,msg:`タイム ${t}秒・${n}投`,btns:[["もう一度FINAL",()=>startRun("final"),true],["成績表をXで共有",()=>openShare(card)],["ホームへ",home]]})}
+  addRun({label:RUN.which==="all"?"全ステージ通し":"FINAL",result:`FINAL失格（${why}）`,win:false});RUN=null;
+  resultScreen({head:"失格",win:false,msg:`${why}・${n}投`,btns:[["もう一度FINAL",()=>startRun("final"),true],["成績表をXで共有",()=>openShare(card)],["ホームへ",home]]});
+}
+
+// ===== 成績表作成モード（全13種目を同じ数ずつ投げる） =====
+let SHEET=null;
+const SHEET_PREF_KEY="mosuke_sheet_pref";
+function sheetPref(){try{const v=JSON.parse(localStorage.getItem(SHEET_PREF_KEY)||"null");if(v&&[3,5,10].includes(v.per))return v}catch(e){}return{per:5,final:true}}
+function setSheetPref(v){try{localStorage.setItem(SHEET_PREF_KEY,JSON.stringify(v))}catch(e){}}
+function saveDraft(){DB.sheetDraft=SHEET;save()}
+function startSheet(per,withFinal){keepAwake();SHEET={per,withFinal,t:Date.now(),ei:0,res:ALL_EVENTS.map(e=>({code:e.code,log:[],skip:false})),final:null};saveDraft();sheetScreen()}
+function resumeSheet(){SHEET=DB.sheetDraft;if(!SHEET)return home();keepAwake();if(SHEET.ei>=ALL_EVENTS.length)return sheetAfterEvents();sheetScreen()}
+// 距離・左右が複数ある種目は、1投ごとに順番に回す（1-1なら 4m→6m→8m→4m…）
+const sheetTarget=(e,i)=>e.targets[i%e.targets.length];
+function sheetScreen(){
+  const e=ALL_EVENTS[SHEET.ei],r=SHEET.res[SHEET.ei],i=r.log.length;
+  const done=SHEET.res.reduce((a,x)=>a+x.log.length,0),total=ALL_EVENTS.length*SHEET.per;
+  const c=r.log.filter(x=>x.ok).length;
+  app.innerHTML=band(`<button data-quit>中断</button>`)+`<div class="play">
+    <div class="sheetprog" aria-label="全体の進み ${done}/${total}投"><div style="width:${done/total*100}%"></div></div>
+    <div class="evtitle"><span class="code">成績表　${e.code}（${SHEET.ei+1}/${ALL_EVENTS.length}種目）</span><span class="nm">${esc(e.name)}</span><span class="rule">${esc(e.kind)}｜${esc(e.rule)}</span></div>
+    ${figBtn(e.code)}
+    <div><div class="biglabel">${i+1}投目 / ${SHEET.per}投　狙い</div><div class="big">${sheetTarget(e,i)}</div></div>
+    <div class="streak">${Array.from({length:SHEET.per},(_,k)=>`<span class="dot lg ${k<i?(r.log[k].ok?"c":""):k===i?"now":"todo"}"></span>`).join("")}</div>
+    <div class="misslabel" style="text-align:center">この種目 ${c}/${i}　全体 ${done}/${total}投</div>
+    <div class="actions"><button class="act miss" data-m>MISS</button><button class="act clear" data-c>CLEAR</button></div>
+    <div class="subacts"><button class="ghost" data-undo ${done||SHEET.ei?"":"disabled"}>↶ 1投もどす</button><button class="ghost" data-skip>この種目をとばす</button></div>
+  </div>`;
+  const q=s=>app.querySelector(s);
+  q("[data-c]").onclick=()=>sheetThrow(true);
+  q("[data-m]").onclick=()=>sheetThrow(false);
+  q("[data-undo]").onclick=sheetUndo;
+  q("[data-skip]").onclick=()=>{r.skip=true;r.log.forEach(()=>unlogThrow());r.log=[];sheetNext()};
+  q("[data-quit]").onclick=()=>resultScreen({head:"中断",win:false,msg:"ここまでの投げは保存してあります。ホームの「続きから」で再開できます。",btns:[
+    ["続ける",sheetScreen,true],["ホームへ（あとで続ける）",home],["ここまでで成績表を出す",()=>sheetResult(true)],["この成績表をやめる",()=>{SHEET=null;DB.sheetDraft=null;save();home()}]]});
+}
+function sheetThrow(ok){
+  const e=ALL_EVENTS[SHEET.ei],r=SHEET.res[SHEET.ei],t=sheetTarget(e,r.log.length);
+  r.log.push({target:t,ok});logThrow(e.code,t,ok,"sheet");buzz(ok?30:[20,40,20]);
+  if(r.log.length>=SHEET.per)return sheetNext();
+  saveDraft();sheetScreen();
+}
+function sheetNext(){SHEET.ei++;saveDraft();if(SHEET.ei>=ALL_EVENTS.length)return sheetAfterEvents();sheetScreen()}
+function sheetUndo(){
+  let r=SHEET.res[Math.min(SHEET.ei,ALL_EVENTS.length-1)];
+  if(SHEET.ei>=ALL_EVENTS.length||!r.log.length){if(SHEET.ei===0)return;SHEET.ei--;r=SHEET.res[SHEET.ei];if(r.skip){r.skip=false;saveDraft();return sheetScreen()}}
+  if(r.log.length){r.log.pop();unlogThrow()}
+  saveDraft();sheetScreen();
+}
+function sheetAfterEvents(){
+  if(!SHEET.withFinal)return sheetResult();
+  resultScreen({head:"13種目<br>おわり",win:true,msg:"最後にFINAL（タイムアタック50）を1回。初期配置に並べてからスタートしてください。",btns:[
+    ["FINALへ",()=>{RUN={which:"final",sheet:true,stages:["final"],si:0,hist:[],log:[]};FIN=null;finalScreen()},true],
+    ["FINALはとばして成績表を出す",()=>{SHEET.final={skip:true};sheetResult()}],
+    ["↶ 最後の1投をもどす",sheetUndo]]});
+}
+function sheetCard(){
+  const rows=ALL_EVENTS.map((e,i)=>{const r=SHEET.res[i],c=r.log.filter(x=>x.ok).length;return{code:e.code,name:e.name,n:r.log.length,c,rate:r.log.length?c/r.log.length:null,skip:r.skip}});
+  const n=rows.reduce((a,r)=>a+r.n,0),c=rows.reduce((a,r)=>a+r.c,0);
+  return{kind:"stats",mode:"sheet",per:SHEET.per,rows,n,c,best:null,final:SHEET.final};
+}
+function sheetResult(partial){
+  const card=sheetCard(),per=SHEET.per,p=pct(card.c,card.n);
+  DB.sheets=DB.sheets||[];
+  const prev=DB.sheets.filter(x=>x.per===per).slice(-1)[0];
+  DB.sheets.push({t:Date.now(),per,n:card.n,c:card.c,final:card.final,partial:!!partial});
+  const fin=card.final&&!card.final.skip?(card.final.win?`・FINAL ${card.final.time.toFixed(1)}秒`:"・FINAL失格"):"";
+  addRun({label:`成績表（各${per}投）`,result:`${card.c}/${card.n}（${p}%）${fin}${partial?"・途中まで":""}`,win:false});
+  SHEET=null;DB.sheetDraft=null;save();
+  const sum=card.rows.map(r=>`<div><span>${r.code} ${esc(r.name)}</span><span>${r.n?`${r.c}/${r.n}（${pct(r.c,r.n)}%）`:"とばし"}</span></div>`).join("");
+  resultScreen({head:`${p}%`,win:true,msg:`成績表（各${per}投）　${card.c}/${card.n}投 成功${fin}${prev&&!partial?`　前回 ${pct(prev.c,prev.n)}%`:""}`,extra:`<div class="summary">${sum}</div>`,
+    btns:[["成績表をXで共有",()=>openShare(card),true],["ホームへ",home]]});
+}
+
+// ===== 種目練習モード =====
+function practice(code){
+  keepAwake();
+  const e=evByCode(code);
+  const P={code,ti:0,session:[]};
+  const draw=()=>{
+    const t=e.targets[P.ti],st=stat(code,t),ss=P.session.filter(x=>x.target===t),sc=ss.filter(x=>x.ok).length;
+    app.innerHTML=band(`<button data-back>もどる</button>`)+`<div class="play">
+      <div class="evtitle"><span class="code">${e.code}　種目練習</span><span class="nm">${esc(e.name)}</span><span class="rule">${esc(e.kind)}｜${esc(e.rule)}</span></div>
+      ${figBtn(e.code)}
+      ${e.targets.length>1?`<div class="chips">${e.targets.map((x,i)=>`<button class="chip" aria-pressed="${i===P.ti}" data-t="${i}">${x}</button>`).join("")}</div>`:""}
+      <div class="big">${t}</div>
+      <div class="tally"><div><b>${sc}/${ss.length}</b><span>今日</span></div><div><b>${ss.length?Math.round(sc/ss.length*100)+"%":"—"}</b><span>今日の成功率</span></div><div><b>${st.rate==null?"—":st.rate+"%"}</b><span>通算（${st.n}投）</span></div></div>
+      <div class="streak">${ss.slice(-30).map(x=>`<span class="dot ${x.ok?"c":""}"></span>`).join("")}</div>
+      <div class="actions"><button class="act miss" data-m>MISS</button><button class="act clear" data-c>CLEAR</button></div>
+      <div class="subacts"><button class="ghost" data-undo ${P.session.length?"":"disabled"}>↶ 1投もどす</button>${P.session.length?`<button class="sharebtn" data-share>成績表をXで共有</button>`:`<span class="ghost">ミス上限なし</span>`}</div></div>`;
+    const q=s=>app.querySelector(s);
+    q("[data-back]").onclick=()=>{if(P.session.length){const c=P.session.filter(x=>x.ok).length;addRun({label:`${e.code} 種目練習`,result:`${c}/${P.session.length}（${Math.round(c/P.session.length*100)}%）`,win:false})}home()};
+    q("[data-c]").onclick=()=>{P.session.push({target:t,ok:true});logThrow(code,t,true,"practice");buzz(30);draw()};
+    q("[data-m]").onclick=()=>{P.session.push({target:t,ok:false});logThrow(code,t,false,"practice");buzz([20,40,20]);draw()};
+    q("[data-undo]").onclick=()=>{if(!P.session.length)return;P.session.pop();unlogThrow();draw()};
+    app.querySelectorAll("[data-t]").forEach(b=>b.onclick=()=>{P.ti=+b.dataset.t;draw()});
+    const sh=q("[data-share]");if(sh)sh.onclick=()=>openShare({kind:"practice",code:e.code,name:e.name,targets:e.targets,session:P.session.slice()});
+  };
+  draw();window.scrollTo(0,0);
+}
+
+home();
+</script>
+
+</body></html>
