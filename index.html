@@ -193,6 +193,9 @@ h2 small{font-family:var(--body);font-size:12px;color:var(--mute);letter-spacing
 .xopen b{font-family:var(--display);font-style:italic;font-weight:900;font-size:20px}
 .xopen.next{background:var(--fg);color:var(--bg)}
 @media (prefers-reduced-motion:reduce){.cardwrap figcaption.flash{animation:none}}
+.datanote{background:var(--panel);border-radius:8px;padding:10px 12px;font-size:12px;color:var(--mute);line-height:1.6}
+.datanote b{color:var(--fg);font-size:13px}
+.datanote ul{margin:4px 0 0;padding-left:1.2em}
 .sharebtn{display:inline-flex;align-items:center;gap:6px;border:1.5px solid var(--fg);border-radius:999px;padding:6px 14px;font-weight:900;font-size:13px;align-self:flex-start}
 .sheet .nav{display:flex;justify-content:space-between;max-width:520px;margin:10px auto 0;gap:8px}
 .sheet .nav button{flex:1;border:1px solid var(--line);border-radius:6px;padding:10px;font-weight:700;font-size:13px}
@@ -532,7 +535,11 @@ function home(){
   <section class="sec"><h2>挑戦の記録</h2>
     <button class="sharebtn" data-share-stats>MöSUKE成績表をXで共有</button>
     <div class="hist">${hist||`<div class="empty">まだ記録がありません。上の「本番どおりに挑戦」から始めると、どこまで進んだかがここに残ります。</div>`}</div>
-    <p class="hint">記録はこのスマホのブラウザにだけ保存されます（ほかの人や端末とは共有されません）。</p>
+    <div class="datanote"><b>記録の保存について</b>
+      <ul><li>記録はこのスマホのブラウザの中だけに保存されます。ページを更新しても消えません</li>
+      <li>別のスマホやブラウザには引き継がれません</li>
+      <li>ブラウザの履歴・サイトデータを消すと、記録も消えます。プライベートブラウズでは保存されません</li>
+      <li>iPhoneは7日間開かないと消えることがあります。共有ボタン →「ホーム画面に追加」で開くと安心です</li></ul></div>
     <div id="reset"><button class="danger" data-reset>記録をすべて消す</button></div>
   </section>`;
   app.querySelectorAll("[data-run]").forEach(b=>b.onclick=()=>startRun(b.dataset.run));
