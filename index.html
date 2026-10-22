@@ -227,6 +227,9 @@ h2 small{font-family:var(--body);font-size:12px;color:var(--mute);letter-spacing
 @media (prefers-reduced-motion:reduce){.cardwrap figcaption.flash{animation:none}}
 .acct{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px;display:flex;flex-direction:column;gap:8px}
 .acct.in{border-color:var(--ok)}
+.welcome{display:flex;flex-direction:column;gap:14px;max-width:560px;margin:18px auto 0}
+.wlead{margin:0;font-size:14px}.wcard{border-color:var(--gold)}.wlist{margin:0;padding-left:1.2em;font-size:13px;color:var(--mute)}.wlist li{margin:2px 0}
+.wskip{background:none;border:1px solid var(--fg)}
 .acct-head{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}.acct-who{color:var(--mute);font-size:13px;word-break:break-all}
 .acct-state{font-size:13px;font-weight:700;color:var(--ok)}.acct-state[data-s="wait"]{color:var(--mute)}.acct-state[data-s="err"]{color:var(--gold)}
 .acct .btn.google{background:#fff;color:#1f1f1f;border-color:#fff}
@@ -321,7 +324,7 @@ function onCloud(snap){
   if(after!==before){saveLocal();if(app.querySelector("[data-sheet-start]")){const y=scrollY;home();scrollTo(0,y)}}
   if(after!==snap.val())schedulePush();else if(!SYNC.timer){SYNC.state="ok";acctStatus()}}
 function startAuth(){
-  fbInit().then(ok=>{if(!ok)return;const auth=firebase.auth();
+  fbInit().then(ok=>{if(!ok){if(onWelcome()){setWelcomeDone();home()}return}const auth=firebase.auth();
     if(auth.isSignInWithEmailLink(location.href)){
       let email="";try{email=localStorage.getItem(EMAIL_KEY)||""}catch(e){}
       if(!email)email=prompt("確認のため、ログインに使ったメールアドレスを入れてください")||"";
@@ -333,7 +336,9 @@ function startAuth(){
       if(SYNC.ref)SYNC.ref.child("db").off();
       SYNC.user=u;SYNC.ref=u?firebase.database().ref("mosuke_self/"+u.uid):null;SYNC.state=u?"wait":"off";
       if(SYNC.ref)SYNC.ref.child("db").on("value",onCloud,()=>{SYNC.state="err";acctStatus()});
-      if(app.querySelector("[data-sheet-start]")){const y=scrollY;home();scrollTo(0,y)}else renderAcct()})})}
+      if(u)setWelcomeDone();
+      if(u&&onWelcome())home();
+      else if(app.querySelector("[data-sheet-start]")){const y=scrollY;home();scrollTo(0,y)}else renderAcct()})})}
 function signInGoogle(){fbInit().then(ok=>{if(!ok)return;firebase.auth().signInWithPopup(new firebase.auth.GoogleAuthProvider())
   .catch(e=>{if(e&&e.code!=="auth/popup-closed-by-user"&&e.code!=="auth/cancelled-popup-request")acctMsg("Googleでログインできませんでした。メールでのログインを試してください")})})}
 function sendLink(email){
@@ -348,6 +353,27 @@ async function signOut(){
   if(SYNC.ref)SYNC.ref.child("db").off();SYNC.ref=null;
   await firebase.auth().signOut();
   DB={throws:[],runs:[],finals:[],sheets:[],sheetDraft:null};saveLocal();home()}
+// 最初に開いたときだけ「ログインして始める／ログインせずに使う」を選んでもらう
+const WELCOME_KEY="mosuke_welcome_done";
+const welcomeDone=()=>{try{return!!localStorage.getItem(WELCOME_KEY)}catch(e){return true}};
+const setWelcomeDone=()=>{try{localStorage.setItem(WELCOME_KEY,"1")}catch(e){}};
+function welcomeScreen(){
+  app.innerHTML=band()+`<div class="welcome">
+    <h2>はじめに</h2>
+    <p class="wlead">MöSUKEの全種目を1人で練習できるアプリです。記録の残し方を選んでください。</p>
+    <div class="acct wcard"><b>ログインして始める</b>
+      <ul class="wlist"><li>記録がクラウドに残る（機種変更やブラウザのデータ削除でも消えない）</li><li>カレンダーと伸びのグラフが使える</li><li>見られるのは自分だけ</li></ul>
+      ${IN_APP?`<p class="hint warn">LINEなどアプリの中で開いているので、Googleログインは使えません。メールでログインするか、右上のメニューから「ブラウザで開く」を選んでください。</p>`:`<button class="btn google" data-google>Googleでログイン</button>`}
+      <div class="acct-mail"><input id="acct-email" type="email" inputmode="email" autocomplete="email" placeholder="メールアドレス" aria-label="メールアドレス"><button class="btn" data-mail>ログイン用リンクを送る</button></div>
+      <p id="acct-msg" class="acct-msg" hidden></p></div>
+    <button class="btn wskip" data-skip>ログインせずに使う</button>
+    <p class="hint">記録はこのスマホの中だけに残ります。あとからホームのいちばん下でログインすれば、それまでの記録も引き継げます。</p>
+  </div>`;
+  const g=app.querySelector("[data-google]");if(g)g.onclick=signInGoogle;
+  const inp=app.querySelector("#acct-email");app.querySelector("[data-mail]").onclick=()=>sendLink(inp.value.trim());inp.onkeydown=e=>{if(e.key==="Enter")sendLink(inp.value.trim())};
+  app.querySelector("[data-skip]").onclick=()=>{setWelcomeDone();home()};
+  window.scrollTo(0,0)}
+const onWelcome=()=>!!app.querySelector("[data-skip]");
 // ホームの「記録の保存」欄
 const STATE_TXT={ok:"✓ クラウドに保存済み",wait:"保存しています…",err:"いまは送れていません（つながったら送ります）",off:""};
 function acctStatus(){const el=document.getElementById("acct-state");if(el){el.textContent=STATE_TXT[SYNC.state]||"";el.dataset.s=SYNC.state}
@@ -1017,7 +1043,7 @@ function practice(code){
   draw();window.scrollTo(0,0);
 }
 
-home();
+if(FB_CONFIG&&!welcomeDone()&&!/[?&]oobCode=/.test(location.search))welcomeScreen();else home();
 startAuth();
 </script>
 
