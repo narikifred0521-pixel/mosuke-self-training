@@ -62,6 +62,11 @@ h2 small{font-family:var(--body);font-size:12px;color:var(--mute);letter-spacing
 .stagehead{font-family:var(--display);font-style:italic;font-weight:900;font-size:13px;letter-spacing:.14em;color:var(--mute);padding:12px 4px 2px}
 
 /* history */
+ .periodbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:999px;padding:2px;background:var(--panel)}
+.seg button{padding:6px 16px;border-radius:999px;font-weight:700;font-size:14px;color:var(--mute)}
+.seg button[aria-pressed="true"]{background:var(--gold);color:#1a1300}
+.psum{font-size:13px;color:var(--mute)}.psum b{color:var(--fg);font-family:var(--display);font-style:italic;font-size:16px;margin:0 1px}
 .hist{display:flex;flex-direction:column;gap:6px}
 .hrow{display:flex;justify-content:space-between;gap:10px;padding:8px 10px;background:var(--panel);border-radius:4px;font-size:13px}
 .hrow .res{font-weight:900}
@@ -249,7 +254,7 @@ let DB=load();
 function logThrow(code,target,ok,mode){DB.throws.push({t:Date.now(),code,target,ok,mode});save()}
 function unlogThrow(){const x=DB.throws.pop();if(x){DB.removed=(DB.removed||[]).concat(tkey(x)).slice(-500)}save()}
 function addRun(r){DB.runs.unshift({t:Date.now(),...r});DB.runs=DB.runs.slice(0,200);save()}
-function stat(code,target){const a=DB.throws.filter(x=>x.code===code&&(target==null||x.target===target));const c=a.filter(x=>x.ok).length;return{n:a.length,c,rate:a.length?Math.round(c/a.length*100):null}}
+function stat(code,target,period){const td=new Date().toDateString();const a=DB.throws.filter(x=>x.code===code&&(target==null||x.target===target)&&(period!=="today"||new Date(x.t).toDateString()===td));const c=a.filter(x=>x.ok).length;return{n:a.length,c,rate:a.length?Math.round(c/a.length*100):null}}
 
 // ===== ログインとクラウド保存（Firebase。設定がない・ログインしないときは今までどおり端末だけ） =====
 // 設定は公開版だけ build.py が window.MOSUKE_FB に入れる。データは mosuke_self/<uid>/db にJSON文字列で置く（本人だけ読める）
@@ -615,11 +620,19 @@ async function openShare(card){
 }
 
 // ===== ホーム =====
+// ホームの記録は「今日／全体」で切り替える。開いたときは、今日投げていれば今日
+let PERIOD=null;
+const hasToday=()=>{const td=dayKey(Date.now());return DB.throws.some(x=>x.code!=="FINAL"&&dayKey(x.t)===td)||DB.runs.some(r=>dayKey(r.t)===td)};
+const periodSeg=()=>`<div class="seg" role="group" aria-label="記録の範囲"><button data-period="today" aria-pressed="${PERIOD==="today"}">今日</button><button data-period="all" aria-pressed="${PERIOD==="all"}">全体</button></div>`;
 function home(){
   stopTimer();
   const sp=sheetPref();
-  const ev=s=>s.events.map(e=>{const st=stat(e.code);return`<button class="evrow" data-ev="${e.code}"><span class="code">${e.code}</span><span class="nm">${esc(e.name)}<em>${esc(e.kind)}・${e.targets.join(" / ")}</em></span><span class="rate">${st.rate==null?"—":st.rate+"%"}<small>${st.n}投</small></span></button>`}).join("");
-  const hist=DB.runs.slice(0,8).map(r=>`<div class="hrow"><span>${fmtDate(r.t)}　${esc(r.label)}</span><span class="res ${r.win?"win":"lose"}">${esc(r.result)}</span></div>`).join("");
+  if(!PERIOD)PERIOD=hasToday()?"today":"all";
+  const td=dayKey(Date.now()),isToday=PERIOD==="today";
+  const sum=statsCard(PERIOD);
+  const runs=isToday?DB.runs.filter(r=>dayKey(r.t)===td):DB.runs.slice(0,8);
+  const ev=s=>s.events.map(e=>{const st=stat(e.code,null,PERIOD);return`<button class="evrow" data-ev="${e.code}"><span class="code">${e.code}</span><span class="nm">${esc(e.name)}<em>${esc(e.kind)}・${e.targets.join(" / ")}</em></span><span class="rate">${st.rate==null?"—":st.rate+"%"}<small>${st.n}投</small></span></button>`}).join("");
+  const hist=runs.map(r=>`<div class="hrow"><span>${fmtDate(r.t)}　${esc(r.label)}</span><span class="res ${r.win?"win":"lose"}">${esc(r.result)}</span></div>`).join("");
   app.innerHTML=band(FB_CONFIG?`<button data-acct-jump>ログイン</button>`:"")+`
   <section class="sec"><h2>本番どおりに挑戦 <small>ミスの上限で止まる</small></h2>
     <div class="stages">
@@ -634,12 +647,14 @@ function home(){
     <button class="btn pri" data-sheet-start>${DB.sheetDraft?"新しく":""}成績表スタート（全<span id="sheet-total">${13*sp.per}</span>投）</button>
     <p class="hint">距離・左右が複数ある種目は、1投ごとに順番に回します（1-1なら 4m→6m→8m→4m…）。終わると成績表の画像をXで共有できます。</p>
   </section>
-  <section class="sec"><h2>種目だけ練習 <small>好きなだけ投げる・成功率を記録</small></h2>
+  <section class="sec" id="sec-practice"><h2>種目だけ練習 <small>好きなだけ投げる・成功率を記録</small></h2>
+    <div class="periodbar">${periodSeg()}<span class="psum">${isToday?"今日":"全体"}　<b>${sum.n}</b>投・成功<b>${sum.c}</b>${sum.n?`（<b>${Math.round(sum.c/sum.n*100)}%</b>）`:""}</span></div>
     <div class="evlist">${STAGES.filter(s=>s.events.length).map(s=>`<div class="stagehead">${s.name}</div>${ev(s)}`).join("")}</div>
   </section>
-  <section class="sec"><h2>挑戦の記録</h2>
-    <button class="sharebtn" data-share-stats>MöSUKE成績表をXで共有</button>
-    <div class="hist">${hist||`<div class="empty">まだ記録がありません。上の「本番どおりに挑戦」から始めると、どこまで進んだかがここに残ります。</div>`}</div>
+  <section class="sec" id="sec-record"><h2>挑戦の記録 <small>${isToday?"今日":"最近8回"}</small></h2>
+    <div class="periodbar">${periodSeg()}</div>
+    <button class="sharebtn" data-share-stats>${isToday?"今日の":"全体の"}MöSUKE成績表をXで共有</button>
+    <div class="hist">${hist||`<div class="empty">${isToday&&DB.runs.length?"今日の挑戦はまだありません。「全体」で過去の記録が見られます。":"まだ記録がありません。上の「本番どおりに挑戦」から始めると、どこまで進んだかがここに残ります。"}</div>`}</div>
     <div id="acct"></div>
     <div id="reset"><button class="danger" data-reset>記録をすべて消す</button></div>
   </section>`;
@@ -649,7 +664,9 @@ function home(){
   document.getElementById("sheet-final").onchange=ev=>{sp.final=ev.target.checked;setSheetPref(sp)};
   app.querySelector("[data-sheet-start]").onclick=()=>startSheet(sp.per,sp.final);
   const rs=app.querySelector("[data-sheet-resume]");if(rs)rs.onclick=resumeSheet;
-  app.querySelector("[data-share-stats]").onclick=()=>{const today=DB.throws.some(x=>x.code!=="FINAL"&&dayKey(x.t)===dayKey(Date.now()));openShare(statsCard(today?"today":"all"))};
+  app.querySelector("[data-share-stats]").onclick=()=>openShare(statsCard(PERIOD));
+  app.querySelectorAll("[data-period]").forEach(b=>b.onclick=()=>{if(PERIOD===b.dataset.period)return;const sec=b.closest("section").id,top=b.getBoundingClientRect().top;PERIOD=b.dataset.period;home();
+    const nb=document.querySelector(`#${sec} [data-period="${PERIOD}"]`);scrollTo(0,scrollY+nb.getBoundingClientRect().top-top)});
   app.querySelector("[data-reset]").onclick=()=>{document.getElementById("reset").innerHTML=`<div class="confirm">本当に消しますか？ <button class="btn" data-yes>消す</button><button class="btn" data-no>やめる</button></div>`;
     app.querySelector("[data-yes]").onclick=()=>{DB={throws:[],runs:[],finals:[],sheets:[],sheetDraft:null,resetAt:Date.now()};save();home()};app.querySelector("[data-no]").onclick=home};
   renderAcct();const aj=app.querySelector("[data-acct-jump]");if(aj)aj.onclick=()=>document.getElementById("acct").scrollIntoView({behavior:"smooth",block:"center"});
@@ -862,13 +879,13 @@ function practice(code){
   const e=evByCode(code);
   const P={code,ti:0,session:[]};
   const draw=()=>{
-    const t=e.targets[P.ti],st=stat(code,t),ss=P.session.filter(x=>x.target===t),sc=ss.filter(x=>x.ok).length;
+    const t=e.targets[P.ti],st=stat(code,t),dt=stat(code,t,"today"),ss=P.session.filter(x=>x.target===t);
     app.innerHTML=band(`<button data-back>もどる</button>`)+`<div class="play">
       <div class="evtitle"><span class="code">${e.code}　種目練習</span><span class="nm">${esc(e.name)}</span><span class="rule">${esc(e.kind)}｜${esc(e.rule)}</span></div>
       ${figBtn(e.code)}
       ${e.targets.length>1?`<div class="chips">${e.targets.map((x,i)=>`<button class="chip" aria-pressed="${i===P.ti}" data-t="${i}">${x}</button>`).join("")}</div>`:""}
       <div class="big">${t}</div>
-      <div class="tally"><div><b>${sc}/${ss.length}</b><span>今日</span></div><div><b>${ss.length?Math.round(sc/ss.length*100)+"%":"—"}</b><span>今日の成功率</span></div><div><b>${st.rate==null?"—":st.rate+"%"}</b><span>通算（${st.n}投）</span></div></div>
+      <div class="tally"><div><b>${dt.c}/${dt.n}</b><span>今日</span></div><div><b>${dt.rate==null?"—":dt.rate+"%"}</b><span>今日の成功率</span></div><div><b>${st.rate==null?"—":st.rate+"%"}</b><span>通算（${st.n}投）</span></div></div>
       <div class="streak">${ss.slice(-30).map(x=>`<span class="dot ${x.ok?"c":""}"></span>`).join("")}</div>
       <div class="actions"><button class="act miss" data-m>MISS</button><button class="act clear" data-c>CLEAR</button></div>
       <div class="subacts"><button class="ghost" data-undo ${P.session.length?"":"disabled"}>↶ 1投もどす</button>${P.session.length?`<button class="sharebtn" data-share>成績表をXで共有</button>`:`<span class="ghost">ミス上限なし</span>`}</div></div>`;
