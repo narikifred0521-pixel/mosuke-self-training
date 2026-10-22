@@ -6,6 +6,7 @@
 <meta name="description" content="MöSUKEの全種目を1人で練習できるアプリ。本番ルールで挑戦、成績表づくり、縮尺どおりの配置図。">
 <style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font-size:14px}img{max-width:100%}[hidden]{display:none!important}</style>
 </head><body>
+<script>window.MOSUKE_FB={"apiKey": "AIzaSyAEI-ljbb7v4yU8L5KN4-w6zd-Gw01hhu4", "authDomain": "morumasa-score-4818b.firebaseapp.com", "databaseURL": "https://morumasa-score-4818b-default-rtdb.asia-southeast1.firebasedatabase.app", "projectId": "morumasa-score-4818b", "storageBucket": "morumasa-score-4818b.firebasestorage.app", "messagingSenderId": "233943384692", "appId": "1:233943384692:web:174283cc6dcbbd55358721"}</script>
 <title>MöSUKE セルフ練習</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -193,6 +194,15 @@ h2 small{font-family:var(--body);font-size:12px;color:var(--mute);letter-spacing
 .xopen b{font-family:var(--display);font-style:italic;font-weight:900;font-size:20px}
 .xopen.next{background:var(--fg);color:var(--bg)}
 @media (prefers-reduced-motion:reduce){.cardwrap figcaption.flash{animation:none}}
+.acct{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px;display:flex;flex-direction:column;gap:8px}
+.acct.in{border-color:var(--ok)}
+.acct-head{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}.acct-who{color:var(--mute);font-size:13px;word-break:break-all}
+.acct-state{font-size:13px;font-weight:700;color:var(--ok)}.acct-state[data-s="wait"]{color:var(--mute)}.acct-state[data-s="err"]{color:var(--gold)}
+.acct .btn.google{background:#fff;color:#1f1f1f;border-color:#fff}
+.acct-mail{display:flex;gap:8px;flex-wrap:wrap}.acct-mail input{flex:1 1 180px;min-width:0;font:inherit;font-size:16px;padding:12px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--fg)}
+.acct-mail .btn{flex:1 1 auto;font-size:14px}
+.acct-msg{margin:0;font-size:13px;color:var(--gold)}.hint.warn{color:var(--gold)}
+.acct .ghost{align-self:flex-start;text-align:left;padding:4px 0}
 .datanote{background:var(--panel);border-radius:8px;padding:10px 12px;font-size:12px;color:var(--mute);line-height:1.6}
 .datanote b{color:var(--fg);font-size:13px}
 .datanote ul{margin:4px 0 0;padding-left:1.2em}
@@ -230,15 +240,110 @@ const FINAL_SEC=70;
 const ALL_EVENTS=STAGES.flatMap(s=>s.events.map(e=>({...e,stage:s.id})));
 const evByCode=c=>ALL_EVENTS.find(e=>e.code===c);
 
-// ===== 保存（この端末のブラウザだけ） =====
+// ===== 保存（この端末のブラウザ。ログイン中はクラウドにも送る） =====
 const KEY="mosuke_self_v1";
 function load(){try{const d=JSON.parse(localStorage.getItem(KEY)||"null");if(d&&d.throws)return d}catch(e){}return{throws:[],runs:[]}}
-function save(){try{localStorage.setItem(KEY,JSON.stringify(DB))}catch(e){}}
+function saveLocal(){try{localStorage.setItem(KEY,JSON.stringify(DB))}catch(e){}}
+function save(){saveLocal();schedulePush()}
 let DB=load();
 function logThrow(code,target,ok,mode){DB.throws.push({t:Date.now(),code,target,ok,mode});save()}
-function unlogThrow(){DB.throws.pop();save()}
+function unlogThrow(){const x=DB.throws.pop();if(x){DB.removed=(DB.removed||[]).concat(tkey(x)).slice(-500)}save()}
 function addRun(r){DB.runs.unshift({t:Date.now(),...r});DB.runs=DB.runs.slice(0,200);save()}
 function stat(code,target){const a=DB.throws.filter(x=>x.code===code&&(target==null||x.target===target));const c=a.filter(x=>x.ok).length;return{n:a.length,c,rate:a.length?Math.round(c/a.length*100):null}}
+
+// ===== ログインとクラウド保存（Firebase。設定がない・ログインしないときは今までどおり端末だけ） =====
+// 設定は公開版だけ build.py が window.MOSUKE_FB に入れる。データは mosuke_self/<uid>/db にJSON文字列で置く（本人だけ読める）
+const FB_CONFIG=window.MOSUKE_FB||null;
+const EMAIL_KEY="mosuke_signin_email";
+const IN_APP=/Line\/|FBAN|FBAV|Instagram|Twitter/i.test(navigator.userAgent);
+const tkey=x=>`${x.t}|${x.code}|${x.target}|${x.ok?1:0}`;
+// 2つの記録を合わせる。同じものは1つに、取り消した投げ（removed）と「すべて消す」より前（resetAt）は落とす
+function mergeDB(a,b){
+  if(!b)return a;if(!a)return b;
+  const resetAt=Math.max(a.resetAt||0,b.resetAt||0);
+  const removed=[...new Set([...(a.removed||[]),...(b.removed||[])])].slice(-500);const rm=new Set(removed);
+  const uni=(x,y,k,useRm)=>{const m=new Map();[...(x||[]),...(y||[])].forEach(v=>{if(v&&v.t>resetAt){const kk=k(v);if(!(useRm&&rm.has(kk))&&!m.has(kk))m.set(kk,v)}});return[...m.values()].sort((p,q)=>p.t-q.t)};
+  const fromB=(b.draftAt||0)>(a.draftAt||0);let draft=fromB?b.sheetDraft||null:a.sheetDraft||null;const draftAt=fromB?b.draftAt:a.draftAt||0;
+  if(draft&&draft.t<=resetAt)draft=null;
+  return{throws:uni(a.throws,b.throws,tkey,true),runs:uni(a.runs,b.runs,r=>r.t+"|"+r.label).reverse().slice(0,200),
+    finals:uni(a.finals,b.finals,f=>String(f.t)),sheets:uni(a.sheets,b.sheets,s=>String(s.t)),
+    sheetDraft:draft,draftAt,resetAt,removed}}
+const SYNC={user:null,ref:null,timer:0,state:"off",busy:false};
+let fbReady=null;
+const loadScript=src=>new Promise((ok,ng)=>{const s=document.createElement("script");s.src=src;s.onload=ok;s.onerror=ng;document.head.appendChild(s)});
+function fbInit(){
+  if(!FB_CONFIG)return Promise.resolve(false);if(fbReady)return fbReady;
+  const b="https://www.gstatic.com/firebasejs/10.12.0/";
+  fbReady=loadScript(b+"firebase-app-compat.js").then(()=>Promise.all([loadScript(b+"firebase-auth-compat.js"),loadScript(b+"firebase-database-compat.js")]))
+    .then(()=>{firebase.initializeApp(FB_CONFIG);firebase.auth().languageCode="ja";return true}).catch(()=>false);
+  return fbReady}
+function schedulePush(){if(!SYNC.ref)return;SYNC.state="wait";clearTimeout(SYNC.timer);SYNC.timer=setTimeout(push,1500);acctStatus()}
+function push(){
+  clearTimeout(SYNC.timer);SYNC.timer=0;if(!SYNC.ref)return Promise.resolve();
+  SYNC.state="wait";acctStatus();
+  return SYNC.ref.child("db").transaction(cur=>{let c=null;try{c=JSON.parse(cur||"null")}catch(e){}return JSON.stringify(mergeDB(DB,c))})
+    .then(()=>{if(!SYNC.timer)SYNC.state="ok";acctStatus()}).catch(()=>{SYNC.state="err";acctStatus()})}
+document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="hidden"&&SYNC.timer)push()});
+function onCloud(snap){
+  let cloud=null;try{cloud=JSON.parse(snap.val()||"null")}catch(e){}
+  const before=JSON.stringify(DB);DB=mergeDB(DB,cloud);const after=JSON.stringify(DB);
+  if(after!==before){saveLocal();if(app.querySelector("[data-sheet-start]")){const y=scrollY;home();scrollTo(0,y)}}
+  if(after!==snap.val())schedulePush();else if(!SYNC.timer){SYNC.state="ok";acctStatus()}}
+function startAuth(){
+  fbInit().then(ok=>{if(!ok)return;const auth=firebase.auth();
+    if(auth.isSignInWithEmailLink(location.href)){
+      let email="";try{email=localStorage.getItem(EMAIL_KEY)||""}catch(e){}
+      if(!email)email=prompt("確認のため、ログインに使ったメールアドレスを入れてください")||"";
+      const clean=()=>history.replaceState(null,"",location.pathname);
+      if(email)auth.signInWithEmailLink(email,location.href).then(()=>{try{localStorage.removeItem(EMAIL_KEY)}catch(e){}clean()})
+        .catch(()=>{clean();alert("ログインできませんでした。リンクの期限切れか、使用済みです。もう一度メールを送ってください")});
+    }
+    auth.onAuthStateChanged(u=>{
+      if(SYNC.ref)SYNC.ref.child("db").off();
+      SYNC.user=u;SYNC.ref=u?firebase.database().ref("mosuke_self/"+u.uid):null;SYNC.state=u?"wait":"off";
+      if(SYNC.ref)SYNC.ref.child("db").on("value",onCloud,()=>{SYNC.state="err";acctStatus()});
+      renderAcct()})})}
+function signInGoogle(){fbInit().then(ok=>{if(!ok)return;firebase.auth().signInWithPopup(new firebase.auth.GoogleAuthProvider())
+  .catch(e=>{if(e&&e.code!=="auth/popup-closed-by-user"&&e.code!=="auth/cancelled-popup-request")acctMsg("Googleでログインできませんでした。メールでのログインを試してください")})})}
+function sendLink(email){
+  if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email))return acctMsg("メールアドレスを確認してください");
+  acctMsg("送っています…");
+  fbInit().then(ok=>{if(!ok)return;firebase.auth().sendSignInLinkToEmail(email,{url:location.origin+location.pathname,handleCodeInApp:true})
+    .then(()=>{try{localStorage.setItem(EMAIL_KEY,email)}catch(e){}acctMsg(`${esc(email)} にログイン用のリンクを送りました。メールを開いてリンクを押してください（迷惑メールに入ることがあります）`)})
+    .catch(()=>acctMsg("送れませんでした。時間をおいてもう一度試してください"))})}
+async function signOut(){
+  if(SYNC.timer||SYNC.state==="wait")await Promise.race([push(),new Promise(r=>setTimeout(r,4000))]);
+  if(SYNC.state==="err"&&!confirm("まだクラウドに送れていない記録があります。ログアウトすると、その分は消えます。続けますか？"))return;
+  if(SYNC.ref)SYNC.ref.child("db").off();SYNC.ref=null;
+  await firebase.auth().signOut();
+  DB={throws:[],runs:[],finals:[],sheets:[],sheetDraft:null};saveLocal();home()}
+// ホームの「記録の保存」欄
+const STATE_TXT={ok:"✓ クラウドに保存済み",wait:"保存しています…",err:"いまは送れていません（つながったら送ります）",off:""};
+function acctStatus(){const el=document.getElementById("acct-state");if(el){el.textContent=STATE_TXT[SYNC.state]||"";el.dataset.s=SYNC.state}
+  const bb=document.querySelector("[data-acct-jump]");if(bb)bb.textContent=SYNC.user?"✓ ログイン中":"ログイン"}
+function acctMsg(t){const el=document.getElementById("acct-msg");if(el){el.innerHTML=t;el.hidden=false}}
+function acctHTML(){
+  if(!FB_CONFIG)return`<div class="datanote"><b>記録の保存について</b>
+      <ul><li>記録はこのスマホのブラウザの中だけに保存されます。ページを更新しても消えません</li>
+      <li>別のスマホやブラウザには引き継がれません</li>
+      <li>ブラウザの履歴・サイトデータを消すと、記録も消えます。プライベートブラウズでは保存されません</li>
+      <li>iPhoneは7日間開かないと消えることがあります。共有ボタン →「ホーム画面に追加」で開くと安心です</li></ul></div>`;
+  if(SYNC.user){const who=SYNC.user.email||SYNC.user.displayName||"ログイン中";
+    return`<div class="acct in"><div class="acct-head"><b>ログイン中</b><span class="acct-who">${esc(who)}</span></div>
+      <div id="acct-state" class="acct-state"></div>
+      <p class="hint">記録はクラウドに保存されます。見られるのは自分だけです。別のスマホでも同じアカウントでログインすれば、同じ記録が見られます。</p>
+      <button class="ghost" data-signout>ログアウト（この端末の記録を消す。クラウドには残ります）</button></div>`}
+  return`<div class="acct"><b>ログインして記録を残す</b>
+    <p class="hint">いまの記録はこのスマホの中だけにあります。ログインするとクラウドに保存され、機種変更やブラウザのデータ削除でも消えません。見られるのは自分だけです。これまでの記録もそのまま引き継ぎます。</p>
+    ${IN_APP?`<p class="hint warn">LINEなどアプリの中で開いているので、Googleログインは使えません。メールでログインするか、右上のメニューから「ブラウザで開く」を選んでください。</p>`:`<button class="btn google" data-google>Googleでログイン</button>`}
+    <div class="acct-mail"><input id="acct-email" type="email" inputmode="email" autocomplete="email" placeholder="メールアドレス" aria-label="メールアドレス"><button class="btn" data-mail>ログイン用リンクを送る</button></div>
+    <p id="acct-msg" class="acct-msg" hidden></p>
+    <p class="hint">ログインしなくても、今までどおり使えます。</p></div>`}
+function renderAcct(){const box=document.getElementById("acct");if(!box)return;box.innerHTML=acctHTML();
+  const g=box.querySelector("[data-google]");if(g)g.onclick=signInGoogle;
+  const m=box.querySelector("[data-mail]");if(m){const inp=box.querySelector("#acct-email");m.onclick=()=>sendLink(inp.value.trim());inp.onkeydown=e=>{if(e.key==="Enter")sendLink(inp.value.trim())}}
+  const so=box.querySelector("[data-signout]");if(so)so.onclick=()=>{if(confirm("ログアウトしますか？ この端末の記録は消えますが、クラウドには残ります。もう一度ログインすれば戻ります"))signOut()};
+  acctStatus()}
 
 // ===== 共通 =====
 const app=document.getElementById("app");
@@ -515,7 +620,7 @@ function home(){
   const sp=sheetPref();
   const ev=s=>s.events.map(e=>{const st=stat(e.code);return`<button class="evrow" data-ev="${e.code}"><span class="code">${e.code}</span><span class="nm">${esc(e.name)}<em>${esc(e.kind)}・${e.targets.join(" / ")}</em></span><span class="rate">${st.rate==null?"—":st.rate+"%"}<small>${st.n}投</small></span></button>`}).join("");
   const hist=DB.runs.slice(0,8).map(r=>`<div class="hrow"><span>${fmtDate(r.t)}　${esc(r.label)}</span><span class="res ${r.win?"win":"lose"}">${esc(r.result)}</span></div>`).join("");
-  app.innerHTML=band()+`
+  app.innerHTML=band(FB_CONFIG?`<button data-acct-jump>ログイン</button>`:"")+`
   <section class="sec"><h2>本番どおりに挑戦 <small>ミスの上限で止まる</small></h2>
     <div class="stages">
       <button class="stbtn all" data-run="all"><b>全ステージ通し</b><span>1st → 2nd → 3rd → FINAL</span></button>
@@ -535,11 +640,7 @@ function home(){
   <section class="sec"><h2>挑戦の記録</h2>
     <button class="sharebtn" data-share-stats>MöSUKE成績表をXで共有</button>
     <div class="hist">${hist||`<div class="empty">まだ記録がありません。上の「本番どおりに挑戦」から始めると、どこまで進んだかがここに残ります。</div>`}</div>
-    <div class="datanote"><b>記録の保存について</b>
-      <ul><li>記録はこのスマホのブラウザの中だけに保存されます。ページを更新しても消えません</li>
-      <li>別のスマホやブラウザには引き継がれません</li>
-      <li>ブラウザの履歴・サイトデータを消すと、記録も消えます。プライベートブラウズでは保存されません</li>
-      <li>iPhoneは7日間開かないと消えることがあります。共有ボタン →「ホーム画面に追加」で開くと安心です</li></ul></div>
+    <div id="acct"></div>
     <div id="reset"><button class="danger" data-reset>記録をすべて消す</button></div>
   </section>`;
   app.querySelectorAll("[data-run]").forEach(b=>b.onclick=()=>startRun(b.dataset.run));
@@ -550,7 +651,8 @@ function home(){
   const rs=app.querySelector("[data-sheet-resume]");if(rs)rs.onclick=resumeSheet;
   app.querySelector("[data-share-stats]").onclick=()=>{const today=DB.throws.some(x=>x.code!=="FINAL"&&dayKey(x.t)===dayKey(Date.now()));openShare(statsCard(today?"today":"all"))};
   app.querySelector("[data-reset]").onclick=()=>{document.getElementById("reset").innerHTML=`<div class="confirm">本当に消しますか？ <button class="btn" data-yes>消す</button><button class="btn" data-no>やめる</button></div>`;
-    app.querySelector("[data-yes]").onclick=()=>{DB={throws:[],runs:[],finals:[]};save();home()};app.querySelector("[data-no]").onclick=home};
+    app.querySelector("[data-yes]").onclick=()=>{DB={throws:[],runs:[],finals:[],sheets:[],sheetDraft:null,resetAt:Date.now()};save();home()};app.querySelector("[data-no]").onclick=home};
+  renderAcct();const aj=app.querySelector("[data-acct-jump]");if(aj)aj.onclick=()=>document.getElementById("acct").scrollIntoView({behavior:"smooth",block:"center"});
   window.scrollTo(0,0);
 }
 
@@ -689,7 +791,7 @@ let SHEET=null;
 const SHEET_PREF_KEY="mosuke_sheet_pref";
 function sheetPref(){try{const v=JSON.parse(localStorage.getItem(SHEET_PREF_KEY)||"null");if(v&&[3,5,10].includes(v.per))return v}catch(e){}return{per:5,final:true}}
 function setSheetPref(v){try{localStorage.setItem(SHEET_PREF_KEY,JSON.stringify(v))}catch(e){}}
-function saveDraft(){DB.sheetDraft=SHEET;save()}
+function saveDraft(){DB.sheetDraft=SHEET;DB.draftAt=Date.now();save()}
 function startSheet(per,withFinal){keepAwake();SHEET={per,withFinal,t:Date.now(),ei:0,res:ALL_EVENTS.map(e=>({code:e.code,log:[],skip:false})),final:null};saveDraft();sheetScreen()}
 function resumeSheet(){SHEET=DB.sheetDraft;if(!SHEET)return home();keepAwake();if(SHEET.ei>=ALL_EVENTS.length)return sheetAfterEvents();sheetScreen()}
 // 距離・左右が複数ある種目は、1投ごとに順番に回す（1-1なら 4m→6m→8m→4m…）
@@ -714,7 +816,7 @@ function sheetScreen(){
   q("[data-undo]").onclick=sheetUndo;
   q("[data-skip]").onclick=()=>{r.skip=true;r.log.forEach(()=>unlogThrow());r.log=[];sheetNext()};
   q("[data-quit]").onclick=()=>resultScreen({head:"中断",win:false,msg:"ここまでの投げは保存してあります。ホームの「続きから」で再開できます。",btns:[
-    ["続ける",sheetScreen,true],["ホームへ（あとで続ける）",home],["ここまでで成績表を出す",()=>sheetResult(true)],["この成績表をやめる",()=>{SHEET=null;DB.sheetDraft=null;save();home()}]]});
+    ["続ける",sheetScreen,true],["ホームへ（あとで続ける）",home],["ここまでで成績表を出す",()=>sheetResult(true)],["この成績表をやめる",()=>{SHEET=null;DB.sheetDraft=null;DB.draftAt=Date.now();save();home()}]]});
 }
 function sheetThrow(ok){
   const e=ALL_EVENTS[SHEET.ei],r=SHEET.res[SHEET.ei],t=sheetTarget(e,r.log.length);
@@ -748,7 +850,7 @@ function sheetResult(partial){
   DB.sheets.push({t:Date.now(),per,n:card.n,c:card.c,final:card.final,partial:!!partial});
   const fin=card.final&&!card.final.skip?(card.final.win?`・FINAL ${card.final.time.toFixed(1)}秒`:"・FINAL失格"):"";
   addRun({label:`成績表（各${per}投）`,result:`${card.c}/${card.n}（${p}%）${fin}${partial?"・途中まで":""}`,win:false});
-  SHEET=null;DB.sheetDraft=null;save();
+  SHEET=null;DB.sheetDraft=null;DB.draftAt=Date.now();save();
   const sum=card.rows.map(r=>`<div><span>${r.code} ${esc(r.name)}</span><span>${r.n?`${r.c}/${r.n}（${pct(r.c,r.n)}%）`:"とばし"}</span></div>`).join("");
   resultScreen({head:`${p}%`,win:true,msg:`成績表（各${per}投）　${card.c}/${card.n}投 成功${fin}${prev&&!partial?`　前回 ${pct(prev.c,prev.n)}%`:""}`,extra:`<div class="summary">${sum}</div>`,
     btns:[["成績表をXで共有",()=>openShare(card),true],["ホームへ",home]]});
@@ -782,6 +884,7 @@ function practice(code){
 }
 
 home();
+startAuth();
 </script>
 
 </body></html>
